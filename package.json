@@ -1,6 +1,6 @@
 {
   "name": "afr",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "main": "afr.js",
   "description": "afr: Always FResh: simple devserver. Serve files, watch files, reinject CSS, reload pages. Compatible with HTTP and websocket proxies. Lightweight alternative to Browsersync and Livereload. Minimal dependencies.",
   "keywords": [

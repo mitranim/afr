@@ -34,7 +34,7 @@ function onChanged(message) {
 function onStylesheetChanged(message) {
   const link = document.createElement('link')
   link.rel = 'stylesheet'
-  link.href = prependSlash(message.path) + '?' + salt()
+  link.href = rootedPath(message.path) + '?' + salt()
 
   const prev = Array.prototype.find.call(document.head.children, elem => (
     elem.tagName === 'LINK' && elem.rel === 'stylesheet' && samePathname(elem.href, link.href)
@@ -44,16 +44,26 @@ function onStylesheetChanged(message) {
 
   link.onload = function() {removeNode(prev)}
   link.onerror = function() {removeNode(link)}
-
-  document.head.appendChild(link)
+  prev.insertAdjacentElement('afterend', link)
 }
 
 function removeNode(node) {
   if (node && node.parentNode) node.parentNode.removeChild(node)
 }
 
-function prependSlash(text) {
-  return text[0] === '/' ? text : '/' + text
+function rootedPath(path) {
+  if (baseHref()) return path
+  if (path[0] === '/') return path
+  return '/' + path
+}
+
+function baseHref() {
+  const base = Array.prototype.find.call(document.head.children, isBase)
+  return (base && base.href) || ''
+}
+
+function isBase(elem) {
+  return elem.tagName === 'BASE'
 }
 
 function salt() {
