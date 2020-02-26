@@ -1,0 +1,8 @@
+html {
+  font-family: Menlo, Consolas, monospace;
+  text-align: center;
+  padding: 4rem;
+  background-color: hsl(0, 0%, 14%);
+  color: white;
+  // color: bisque;
+}

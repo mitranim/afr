@@ -1,0 +1,28 @@
+{
+  "name": "afr",
+  "version": "0.1.0",
+  "main": "afr.js",
+  "description": "afr: Always FResh: simple devserver. Serve files, watch files, reinject CSS, reload pages. Compatible with HTTP and websocket proxies. Lightweight alternative to Browsersync and Livereload. Minimal dependencies.",
+  "keywords": [
+    "devserver",
+    "watch",
+    "static",
+    "proxy",
+    "browsersync",
+    "livereload"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mitranim/afr.git"
+  },
+  "license": "WTFPL",
+  "dependencies": {
+    "chokidar": "^3.3",
+    "node-static": "^0.7",
+    "ws": "^7.2"
+  },
+  "devDependencies": {
+    "babel-eslint": "10.0.3",
+    "eslint": "6.8.0"
+  }
+}
