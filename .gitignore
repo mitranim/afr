@@ -1,9 +1,8 @@
 /*
-!/example
-!/.eslintrc
-!/.gitignore
-!/.npmignore
-!/afr.js
-!/client.js
+!/bin
+!/examples
+!/.*rc
+!/.*ignore
+!/*.mjs
+!/*.md
 !/package.json
-!/readme.md

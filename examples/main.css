@@ -4,5 +4,9 @@ html {
   padding: 4rem;
   background-color: hsl(0, 0%, 14%);
   color: white;
-  // color: bisque;
+  /* color: bisque; */
+}
+
+a[href] {
+  color: aqua;
 }
