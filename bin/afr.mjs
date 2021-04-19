@@ -55,7 +55,7 @@ Daemon commands take --port (default ${afr.defaultPort}).
 }
 
 function cmdHint([key, {descr}], width) {
-  return `  npx afr ${key.padEnd(width)} -- ${descr}`
+  return `  afr ${key.padEnd(width)} -- ${descr}`
 }
 
 function echo(opts) {return opts}

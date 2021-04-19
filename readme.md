@@ -363,7 +363,7 @@ The following functions can control Afr's tiny daemon from inside your Node proc
 * `daemonStart(opts)`
 * `daemonStop(opts)`
 
-All of them are async (return promises). The names should be self-explanatory. They're also exposed via Afr's CLI; run `npx afr` for help.
+All of them are async (return promises). The names should be self-explanatory. They're also exposed via Afr's [CLI](#cli); run `npx afr` for help.
 
 `opts` are optional, and may contain `port` and `timeout`. For sending, opts may also contain `key`. Clients ignore messages whose key doesn't match theirs. This allows multiple apps, connected to the same local daemon, to ignore each other's change notifications. Key is provided to clients by appending `?key=some-key` to the client script URL:
 
@@ -402,7 +402,7 @@ Object.assign(afr.contentTypes, {
 })
 ```
 
-### `defaultPort`
+#### `defaultPort`
 
 Port on which Afr's optional daemon listens by default. Used by the various daemon funs if port is unspecified.
 
