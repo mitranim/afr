@@ -47,9 +47,7 @@ function onMessage(msg) {
   }
 }
 
-function onDeinit() {
-  scheduleReinit()
-}
+function onDeinit() {scheduleReinit()}
 
 function onChange(msg) {
   const ext = extName(msg.path)
@@ -67,44 +65,48 @@ function onChange(msg) {
 }
 
 function onStylesheetChanged({path}) {
+  path = rootedPath(path)
+
+  const prev = findSimilarStylesheets(path)
+  if (!prev.length) return
+
   const link = document.createElement('link')
   link.rel = 'stylesheet'
-  link.href = rootedPath(path) + '?' + salt()
+  link.href = salted(path)
 
-  const prev = Array.prototype.find.call(document.head.children, elem => (
-    elem.tagName === 'LINK' && elem.rel === 'stylesheet' && samePathname(elem.href, link.href)
+  link.onerror = link.remove
+  link.onload = linkOnLoad
+  last(prev).insertAdjacentElement('afterend', link)
+}
+
+function findSimilarStylesheets(pathname) {
+  return [...document.head.querySelectorAll(`link[rel=stylesheet]`)].filter(node => (
+    new URL(node.href).pathname === pathname
   ))
+}
 
-  if (!prev) return
+function linkOnLoad() {
+  this.onerror = null
+  this.onload = null
 
-  link.onload = prev.remove.bind(prev)
-  link.onerror = link.remove.bind(link)
-  prev.insertAdjacentElement('afterend', link)
+  const links = findSimilarStylesheets(new URL(this.href).pathname)
+  for (const node of init(links)) node.remove()
 }
 
 function rootedPath(path) {
-  if (baseHref()) return path
-  if (path[0] === '/') return path
-  return '/' + path
+  path = path.replace(/^[/]*/g, '')
+  return baseExists() ? path : `/${path}`
 }
 
-function baseHref() {
-  const base = Array.prototype.find.call(document.head.children, isBase)
-  return (base && base.href) || ''
+function baseExists() {
+  const node = document.head.querySelector('base')
+  return Boolean(node && node.href)
 }
 
-function isBase(elem) {
-  return elem.tagName === 'BASE'
-}
+function salted(str) {return `${str}?${salt()}`}
 
 function salt() {
   return String(Math.random()).replace(/\d*\./, '').slice(0, 6)
-}
-
-function samePathname(left, right) {
-  left = left.replace(/[?].*/, '')
-  right = right.replace(/[?].*/, '')
-  return left === right
 }
 
 function extName(path = '') {
@@ -115,3 +117,6 @@ function extName(path = '') {
 function equiv(a, b) {
   return (a == null && b == null) || Object.is(a, b)
 }
+
+function init(list) {return list.slice(0, list.length - 1)}
+function last(list) {return list[list.length - 1]}

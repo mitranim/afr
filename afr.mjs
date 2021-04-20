@@ -337,7 +337,6 @@ export class Broadcaster extends Set {
     }
   }
 
-  // WTB more specific name.
   handle(req, res) {
     const {pathname} = ur.parse(req.url)
 

@@ -434,6 +434,16 @@ Afr is really geared towards being run from inside your Node server. As such, it
 
 As stated elsewhere in the documentation, Afr's file-serving features are probably not production-grade. It simplifies your environment, but for production, you should serve files via something like Nginx.
 
+## Changelog
+
+### `0.2.1`
+
+Corrected minor race condition in CSS replacement.
+
+### `0.2.0`
+
+Now an extra-powerful all-in-one.
+
 ## License
 
 https://unlicense.org
