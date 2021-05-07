@@ -5,9 +5,44 @@ import * as ht from 'http'
 import * as pt from 'path'
 import * as ur from 'url'
 
-/* Public API */
+/* Public vars */
 
-export async function daemonExists({port = defaultPort, timeout = defaultTimeout} = {}) {
+export const defaultPort = 23456
+
+export const change = {type: 'change'}
+
+export const contentTypes = {
+  '.css':   'text/css',
+  '.gif':   'image/gif',
+  '.htm':   'text/html',
+  '.html':  'text/html',
+  '.ico':   'image/x-icon',
+  '.jpeg':  'image/jpeg',
+  '.jpg':   'image/jpeg',
+  '.js':    'application/javascript',
+  '.json':  'application/json',
+  '.mjs':   'application/javascript',
+  '.pdf':   'application/pdf',
+  '.png':   'image/png',
+  '.svg':   'image/svg+xml',
+  '.tif':   'image/tiff',
+  '.tiff':  'image/tiff',
+  '.webp':  'image/webp',
+  '.woff':  'font/woff',
+  '.woff2': 'font/woff2',
+  '.xml':   'text/xml',
+  '.zip':   'application/zip',
+}
+
+/* Public funs */
+
+export function dirs()  {return new Dirs(...arguments)}
+export function dir()   {return new Dir(...arguments)}
+export function wat()   {return new Watcher(...arguments)}
+export function broad() {return new Broadcaster(...arguments)}
+export function aio()   {return new Aio(...arguments)}
+
+export function daemonExists({port = defaultPort, timeout = defaultTimeout} = {}) {
   const req = ht.get({port, timeout})
   return reqWait(req).then(resOnlyOk).then(streamToJson)
 }
@@ -81,7 +116,18 @@ export function serveFile(res, status, fsPath) {
   })
 }
 
-export function dirs() {return new Dirs(...arguments)}
+export function fsMsg(type, path) {
+  valid(type, isStr)
+  return {type, path: fsPathToUrlPath(path)}
+}
+
+export function onListen(srv, err) {
+  if (err) throw err
+  const {port} = srv.address()
+  console.log(`listening on http://localhost:${port}`)
+}
+
+/* Public classes */
 
 export class Dirs extends Array {
   constructor(...args) {
@@ -161,12 +207,6 @@ export class Dirs extends Array {
     valid(type, isStr)
     return {type, path: this.fsPathToUrlPath(path)}
   }
-}
-
-export function dir() {return new Dir(...arguments)}
-
-function isDirTest(val) {
-  return isFun(val) || isReg(val)
 }
 
 export class Dir {
@@ -275,8 +315,6 @@ export class Dir {
   }
 }
 
-export function wat() {return new Watcher(...arguments)}
-
 export class Watcher extends Set {
   add(ref) {
     valid(ref, isCloser)
@@ -299,8 +337,6 @@ export class Watcher extends Set {
     for (const ref of this) this.delete(ref)
   }
 }
-
-export function broad() {return new Broadcaster(...arguments)}
 
 export class Broadcaster extends Set {
   constructor({namespace = '/afr'} = {}) {
@@ -343,6 +379,8 @@ export class Broadcaster extends Set {
     if (pathname === pt.posix.join(this.namespace, 'client.mjs')) {
       if (onlyGet(res, req.method)) return true
       const path = clientScriptPath
+
+      // TODO: use `serveFile` instead.
       maybeSetContentType(res, path)
       fs.createReadStream(path).pipe(res)
       return true
@@ -368,8 +406,6 @@ export class Broadcaster extends Set {
     this.send({type: 'deinit', ...msg})
   }
 }
-
-export function aio() {return new Aio(...arguments)}
 
 // Short for "all-in-one".
 export class Aio {
@@ -403,44 +439,6 @@ export class Aio {
     this.wat.deinit()
     this.bro.deinit()
   }
-}
-
-export function fsMsg(type, path) {
-  valid(type, isStr)
-  return {type, path: fsPathToUrlPath(path)}
-}
-
-export function onListen(srv, err) {
-  if (err) throw err
-  const {port} = srv.address()
-  console.log(`listening on http://localhost:${port}`)
-}
-
-export const defaultPort = 23456
-
-export const change = {type: 'change'}
-
-export const contentTypes = {
-  '.css':   'text/css',
-  '.gif':   'image/gif',
-  '.htm':   'text/html',
-  '.html':  'text/html',
-  '.ico':   'image/x-icon',
-  '.jpeg':  'image/jpeg',
-  '.jpg':   'image/jpeg',
-  '.js':    'application/javascript',
-  '.json':  'application/json',
-  '.mjs':   'application/javascript',
-  '.pdf':   'application/pdf',
-  '.png':   'image/png',
-  '.svg':   'image/svg+xml',
-  '.tif':   'image/tiff',
-  '.tiff':  'image/tiff',
-  '.webp':  'image/webp',
-  '.woff':  'font/woff',
-  '.woff2': 'font/woff2',
-  '.xml':   'text/xml',
-  '.zip':   'application/zip',
 }
 
 /* Internal Utils */
@@ -572,6 +570,7 @@ function pathToPosix(path) {
   return path.replaceAll(pt.sep, pt.posix.sep)
 }
 
+// TODO: return a dict to be passed to `res.writeHead`.
 function maybeSetContentType(res, path) {
   const type = contentType(path)
   if (type) res.setHeader('content-type', type)
@@ -795,3 +794,7 @@ function initEventStreamRes(res) {
 }
 
 function ignore() {}
+
+function isDirTest(val) {
+  return isFun(val) || isReg(val)
+}
