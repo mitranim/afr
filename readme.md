@@ -13,6 +13,7 @@ Other features:
 * Not a separate server. Runs from _within_ your Node server, without complicating your environment.
 * Can signal page reload _after server restart_. Extremely useful when developing a server-rendered app.
   * Implemented via tiny daemon, controllable via tiny bundled CLI.
+  * Takes signals from any process, from any language.
 * Flexible directory configuration: multiple paths with filters, separate for file serving and file watching.
 
 Super-lightweight alternative to Browsersync and Livereload. Also replaces `node-static` for files.
@@ -435,6 +436,10 @@ Afr is really geared towards being run from inside your Node server. As such, it
 As stated elsewhere in the documentation, Afr's file-serving features are probably not production-grade. It simplifies your environment, but for production, you should serve files via something like Nginx.
 
 ## Changelog
+
+### `0.2.2`
+
+File server corrections for Windows compatibility.
 
 ### `0.2.1`
 

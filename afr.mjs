@@ -302,8 +302,11 @@ export class Dir {
 
   urlPathToFsPath(urlPath) {
     valid(urlPath, isStr)
-    const fsPath = pt.join(this.root, urlPathToFsPath(urlPath))
+    if (urlPath.includes('..')) return undefined
+
+    const fsPath = pt.join(this.root, urlPath)
     if (this.allow(fsPath)) return fsPath
+
     return undefined
   }
 
@@ -554,11 +557,6 @@ async function fileExists(fsPath) {
     if (err.code === 'ENOENT') return false
     throw err
   }
-}
-
-function urlPathToFsPath(urlPath) {
-  valid(urlPath, isStr)
-  return pt.join('.', ur.fileURLToPath(new URL(urlPath, 'file:')))
 }
 
 function fsPathToUrlPath(path) {
