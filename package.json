@@ -1,6 +1,6 @@
 {
   "name": "afr",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "main": "./afr.mjs",
   "bin": "./bin/afr.mjs",

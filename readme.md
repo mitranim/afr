@@ -437,6 +437,10 @@ As stated elsewhere in the documentation, Afr's file-serving features are probab
 
 ## Changelog
 
+### `0.2.3`
+
+File server corrections for Windows compatibility (for real this time).
+
 ### `0.2.2`
 
 File server corrections for Windows compatibility.

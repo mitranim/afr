@@ -304,7 +304,7 @@ export class Dir {
     valid(urlPath, isStr)
     if (urlPath.includes('..')) return undefined
 
-    const fsPath = pt.join(this.root, urlPath)
+    const fsPath = urlPathToFsPath(this.root, urlPath)
     if (this.allow(fsPath)) return fsPath
 
     return undefined
@@ -795,4 +795,16 @@ function ignore() {}
 
 function isDirTest(val) {
   return isFun(val) || isReg(val)
+}
+
+function urlPathToFsPath(root, urlPath) {
+  urlPath = new URL(urlPath, 'file:').pathname
+
+  const rootUrl = ur.pathToFileURL(root)
+  rootUrl.pathname = pt.posix.join(rootUrl.pathname, urlPath)
+
+  const fsPath = ur.fileURLToPath(rootUrl)
+
+  if (pt.isAbsolute(root)) return fsPath
+  return pt.relative(process.cwd(), fsPath)
 }
