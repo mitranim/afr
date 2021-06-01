@@ -1,5 +1,4 @@
 const url = new URL(import.meta.url)
-const base = new URL('.', url)
 const clientKey = url.searchParams.get('key') || undefined
 const delay = 1024
 let req
@@ -9,7 +8,7 @@ reinit()
 
 function reinit() {
   deinit()
-  req = new EventSource(`${base}events`)
+  req = new EventSource(new URL('events', url))
   req.onmessage = onEventStreamMessage
   req.onerror = scheduleReinit
 }

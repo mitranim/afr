@@ -1,42 +1,55 @@
 ## Overview
 
-`afr`: **A**lways **Fr**esh. Tiny Node.js library that:
+`afr`: **A**lways **Fr**esh. Tiny library for [Node](https://nodejs.org) and [Deno](https://deno.land) that:
 
-* Watches files.
+* Reloads pages on changes.
 * Reinjects CSS without reloading.
-* Reloads pages on other changes.
-* Serves files. (Optionally with `.html` and `index.html` fallbacks.)
+* Optionally serves files.
+  * Optionally just like GitHub Pages.
+
+Two components:
+
+* Server component:
+  * Used inside your server, or via optional CLI.
+  * Notifies clients.
+  * Notification can be triggered by HTTP request from another process.
+    * Allows page reload _immediately_ after server restart. See [`examples`](tree/master/examples).
+* Client component:
+  * Tiny [script](blob/master/client.mjs).
+  * Listens for server notifications.
+  * Reinjects CSS without reloading. Reloads on other changes.
 
 Other features:
 
-* One small file, dependency-free. Being small is a big feature!
-* Not a separate server. Runs from _within_ your Node server, without complicating your environment.
+* Tiny and dependency-free. Being small is a big feature!
+  * Caveat: invoking optional Deno CLI imports some stdlib modules. This is completely skippable.
+* Doesn't force a separate server. Runs from _within_ your Node/Deno server, without complicating your environment. Optionally, run separately via CLI.
 * Can signal page reload _after server restart_. Extremely useful when developing a server-rendered app.
-  * Implemented via tiny daemon, controllable via tiny bundled CLI.
-  * Takes signals from any process, from any language.
-* Flexible directory configuration: multiple paths with filters, separate for file serving and file watching.
+  * Implemented by running in a separate process, sending notifications from your main server process.
+  * Accepts signals over HTTP, which can be sent from any process, from any language.
+* Serves static files with a flexible directory configuration. Allows multiple paths with filters.
 
-Super-lightweight alternative to Browsersync and Livereload. Also replaces `node-static` for files.
+Super-lightweight alternative to Browsersync, Livereload, and file-serving libraries.
 
 ## TOC
 
 * [Why](#why)
 * [Usage](#usage)
-  * [High Level](#high-level)
-  * [Normal Server](#normal-server)
-  * [Server Restart Signal](#server-restart-signal)
-  * [File Serving](#file-serving)
-  * [Notes on Proxying](#notes-on-proxying)
+  * [As Library](#as-library)
+  * [Node CLI](#node-cli)
+  * [Deno CLI](#deno-cli)
+* [Examples](#examples)
 * [API](#api)
-  * [`class Aio`](#class-aio)
-  * [`class Broadcaster`](#class-broadcaster)
-  * [`class Dir`](#class-dir)
-  * [`class Dirs`](#class-dirs)
-  * [`class Watcher`](#class-watcher)
-  * [`function serveFile`](#servefileres-httpcode-fspath)
-  * [Daemon Funs](#daemon-funs)
-  * [Vars](#vars)
-* [CLI](#cli)
+  * [`class Broad`](#class-broadopts)
+  * [`class Dir`](#class-dirpath-filter)
+  * [`function send`](#function-sendmsg-opts)
+  * [`function maybeSend`](#function-maybesendmsg-opts)
+  * [`function watch`](#function-watchpath-dirs-opts)
+  * [`function serveFile`](#function-servefile)
+  * [`function serveSite`](#function-servesite)
+  * [`function serveSiteWithNotFound`](#function-servesitewithnotfound)
+  * [`function serveExactFile`](#function-serveexactfile)
+  * [Undocumented](#undocumented)
 * [Known Limitations](#known-limitations)
 * [Misc](#misc)
 
@@ -44,398 +57,378 @@ Super-lightweight alternative to Browsersync and Livereload. Also replaces `node
 
 This library is born from frustrations with Browsersync and other related tools. Advantages:
 
-* Extremely small and simple.
-* No dependencies (rather than **tens of megabytes** in BS).
+* Very small, simple, fast.
+* No dependencies, rather than customary **tens of megabytes**.
+  * Caveat: invoking optional Deno CLI imports some stdlib modules.
 * Doesn't require its own server; plugs into yours.
+  * Doesn't infect your stack with junk.
+  * Doesn't prevent you from proxying websockets.
 * Silent, doesn't spam your terminal with crap.
-* No delays in the file watcher or anywhere else.
+* No forced delays.
 * Compatible with plain Node servers. **No** Express/Connect junk.
+* Compatible with plain Deno servers. **No** framework junk.
+  * Caveat: assumes stdlib server. At the time of writing, `Deno.serveHttp` is too immature. This may change in the future.
 * Injected CSS doesn't have long-ass names.
-* Failing webpage requests don't get stuck loading forever.
-* Doesn't prevent you from proxying websockets.
+* Failing webpage requests don't get stuck forever.
 * Reliable: if the server is running, the client is connected.
-* Can signal page reload after server restart.
+* Can reload pages immediately after server restart.
+* Built-in file server.
+  * Optionally compatible with GitHub Pages rules.
 * ... probably more that I'm forgetting to mention.
 
 ## Usage
+
+### As Library
+
+In Node, via NPM:
 
 ```sh
 npm i -ED afr
 ```
 
-Afr must be inited in two places: Node.js and your HTML markup.
-
-To enable automatic page reload or CSS reinject, append one of these to your HTML. Which one, depends on how you start Afr. See the API below. Note that `type="module"` is required.
-
-```html
-<script type="module" src="/afr/client.mjs"></script>
-<script type="module" src="http://localhost:23456/client.mjs"></script>
+```js
+import * as a from 'afr'
 ```
 
-You can optionally specify `?key=some-key` in the script URL. Clients with a key will ignore server messages without the matching key.
-
-### High Level
-
-High-level shortcut. This will serve and watch all files in one directory. The "handle site" method will automatically look for `.html` and `index.html` fallbacks, like many static servers including GitHub Pages. The client will reinject CSS or reload the page on changes to the watched files.
-
-Client code:
-
-```html
-<script type="module" src="/afr/client.mjs"></script>
-```
-
-Server code:
+In Deno, by URL:
 
 ```js
-import * as http from 'http'
-import * as afr from 'afr'
-
-const srv = new http.Server()
-const aio = new afr.Aio()
-
-aio.serve('public')
-aio.watch('public')
-
-srv.listen(0, onListen)
-srv.on('request', aio.handleSiteOr404)
-
-function onListen(err) {afr.onListen(srv, err)}
+import * as a from 'https://unpkg.com/afr@<version>/afr_deno.mjs'
 ```
 
-### Normal Server
+### Node CLI
 
-Afr never "runs" a server. It creates objects acting as request handlers. You decide where to call them, from within your own stack of request handlers / routes.
+In Node, Afr CLI can be invoked by `npx`:
 
-Client code:
-
-```html
-<script type="module" src="/afr/client.mjs"></script>
+```sh
+npx afr --help
+npx afr --port 23456 --verbose true
 ```
 
-Server code:
+`npx` is stupidly slow, so I recommend bypassing it:
 
-```js
-import * as http from 'http'
-import * as afr from 'afr'
+  * Unix: add `export PATH="$PATH:./node_modules/.bin"` to your shell pro-file (usually `~/.profile` or `~/.bash_profile`).
+  * Windows: add `.\node_modules\.bin` to your `%PATH%` via System Properties → Advanced → Environment Variables.
 
-const srv = new http.Server()
-const aio = new afr.Aio()
+After reloading your env variables, this lets you invoke CLIs, installed locally by NPM, directly without `npx`:
 
-aio.serve('public')
-aio.watch('public')
-
-srv.listen(0, onListen)
-srv.on('request', onRequest)
-
-function onListen(err) {afr.onListen(srv, err)}
-
-function onRequest(req, res) {
-  // Serves the client script or handles the client data uplink.
-  // If true, the request is handled, and you should leave it alone.
-  if (aio.handle(req, res)) return
-
-  // Your own handling.
-  res.writeHead(404)
-  res.end('not found')
-}
+```sh
+afr --help
+afr --port 23456 --verbose true
 ```
 
-### Server Restart Signal
+You can also:
 
-When restarting the server (via an external watch tool such as `watchexec`), it's extremely useful to reload the client immediately after server start. No earlier, no later. Afr lets you do that.
-
-To make this work, your server will start a tiny persistent daemon, and you must load the Afr client script from the daemon's local address, rather than your server's address.
-
-Client code:
-
-```html
-<script type="module" src="http://localhost:23456/client.mjs"></script>
+```sh
+node node_modules/afr/afr_node.mjs --help
+node node_modules/afr/afr_node.mjs --port 23456 --verbose true
 ```
 
-Server code:
+### Deno CLI
 
-```js
-import * as http from 'http'
+In Deno, there's no specialized CLI shortcut. Just run the "main" file:
 
-const srv = new http.Server()
-const dirs = afr.dirs(afr.dir('public'))
-
-srv.listen(0, onListen)
-srv.on('request', someRequestHandling)
-
-function onListen(err) {
-  // Print startup msg + address.
-  afr.onListen(srv, err)
-
-  // Start a tiny Afr daemon (default address `http://localhost:23456`).
-  afr.daemonStart()
-
-  // Notify clients, auto-reload pages.
-  afr.daemonMaybeSend(afr.change)
-
-  // Notify the daemon's clients on changes to the given dirs.
-  dirs.watchMsg(afr.wat(), {}, afr.daemonMaybeSend)
-}
-
-function ignore() {}
+```sh
+deno run --allow-net --allow-read https://unpkg.com/afr@<version>/afr_deno.mjs --help
+deno run --allow-net --allow-read https://unpkg.com/afr@<version>/afr_deno.mjs --port 23456 --verbose true
 ```
 
-Also see [CLI](#cli) for daemon commands.
+## Examples
 
-### File Serving
-
-Afr can either watch files, serve files, or both. These features are completely orthogonal. Both are related to the [`Dir`](#class-dir) and [`Dirs`](#class-dirs) APIs.
-
-This example configuration will serve files from several directories, matching them in this order. For the `.` directory, it will serve only the files whose path, relative to the CWD, matches the given regexp. It will not serve anything else.
-
-There are other file-serving methods; check the API reference. For development, it should be perfectly sufficient. For production, use a real file server like Nginx.
-
-```js
-const pubDirs = afr.dirs(
-  afr.dir('target'),
-  afr.dir('static'),
-  afr.dir('.', /^(?:images|scripts|node_modules)[/]/),
-)
-
-async function onRequest(req, res) {
-  if (await pubDirs.handleFile(req, res)) return
-
-  // Your own handling.
-  res.writeHead(404)
-  res.end('not found')
-}
-```
-
-### Notes on Proxying
-
-Afr doesn't include special proxy support because it merely provides request handlers for your server. For many apps, this already eliminates the need for proxies!
+For runnable examples: clone this repo, `cd` to [`examples`](tree/master/examples), and run `make`.
 
 ## API
 
-Some less-important APIs are undocumented, to avoid bloating the docs. Check `afr.mjs` and look for `exports`. Note that many useful APIs are methods on classes such as [`Aio`](#class-aio) and [`Dirs`](#class-dirs).
+### `class Broad(opts)`
 
-### `class Aio`
+Short for "broadcaster". Handles Afr clients:
 
-Short for "all-in-one". Shortcut that combines `Watcher`, `Broadcaster`, and `Dirs` into one package, convenient for jumpstarting a site/app. See [High Level](#high-level) for an example.
+  * Serves `client.mjs`.
+  * Maintains persistent connections from clients waiting for notifications.
+  * Broadcasts notifications to those clients.
 
-Any options passed to `Aio` are passed to its internal `Broadcaster`.
+The constructor takes the following options:
 
-### `class Broadcaster`
+```ts
+interface BroadOpts {
+  // URL pathname prefix for all Afr endpoints, including the client script.
+  namespace?: string = '/afr/';
+}
+```
 
-Lower-level tool dedicated to serving `client.mjs` and maintaining client data uplinks. Used internally by other tools.
+In Node:
 
 ```js
-const bro = afr.broad()
+const bro = new a.Broad()
 
-function onRequest(req, res) {
-  // Either serve the client script, or store the connection
-  // for later broadcasts.
-  if (bro.handle(req, res)) return
+async function respond(req, res) {
+  if (await bro.respond(req, res)) return
 
-  // Your own handling.
-  res.writeHead(404)
-  res.end('not found')
+  // Your own request handling.
+  res.end('ok')
 }
 
-// Broadcast a message to all connected clients.
-bro.send(afr.change)
-
-// Close all current connections.
-bro.deinit()
+// Broadcasts a reload signal to all clients.
+async function change() {
+  await bro.send({type: 'change'})
+}
 ```
 
-The option `namespace` (default `/afr`) controls the base URL path for Afr's endpoints (client script and event notifications). If `/afr` conflicts with your own endpoint, pass a different namespace, and change the pathname in the client script:
+In Deno (stdlib server):
 
 ```js
-const bro = afr.broad({namespace: '/development/afr'})
+const bro = new a.Broad()
+
+// Broadcasts a reload signal to all clients.
+await bro.send({type: 'change'})
+
+async function respond(req) {
+  if (await bro.respond(req)) return
+
+  // Your own request handling.
+  await req.respond({body: 'ok'})
+}
+
+// Broadcasts a reload signal to all clients.
+async function change() {
+  await bro.send({type: 'change'})
+}
 ```
 
-```html
-<script type="module" src="/development/afr/client.mjs"></script>
-```
+Running Afr as a CLI starts an HTTP server that handles all requests using a [`Broad`](#class-broadopts) instance and responds with 404 to everything unknown.
 
-### `class Dir`
+### `class Dir(path, filter)`
 
-Fundamental tool for file serving and watching. Essentially a filter. Should usually be combined with others into `Dirs`, see below.
-
-Matches all files in the directory:
+Fundamental tool for serving files and handling FS events. Takes an FS path and an optional filter. For example:
 
 ```js
-const dir = afr.dir('public')
+const dir = a.dir('target', /[.]html|css|mjs$/)
 ```
 
-Matches only the files that pass the filter. The filter may be a regexp or a function.
+Many Afr functions require an array of dirs:
 
 ```js
-const dir = afr.dir('.', /^(?:static|images|styles)/)
+const dirs = [
+  a.dir('target'),
+  a.dir('.', /[.]html|css|mjs$/),
+]
 ```
 
-### `class Dirs`
+The filter may be either a regexp or a function. Afr applies it to a path that is Posix-style (`/`-separated), relative to the dir, and _not_ URL-encoded. Dirs without a filter are permissive and "allow" any sub-path when asked.
 
-Fundamental tool for file serving and watching. Collection of `Dir` objects that can serve or watch in aggregate.
+```js
+const dirs = [
+  a.dir('target'),
+  a.dir('.', /^static|images|scripts[/]/),
+]
+```
+
+### `function send(msg, opts)`
+
+Broadcasts `msg` to Afr clients. Assumes that on `opts.url` or `opts.hostname + opts.port` there is a reachable server that handles requests using [`Broad`](#class-broadopts) instance, and makes an HTTP request that causes that broadcaster to relay `msg`, as JSON, to every connected client.
+
+```ts
+interface SendOpts {
+  url?: URL;
+  port?: number;
+  hostname?: string;
+  namespace?: string;
+}
+```
+
+This is useful when running Afr and your own server in separate processes. This allows clients to stay connected when your server restarts, and immediately reload when it's ready.
+
+See the [`examples`](tree/master/examples) folder for runnable Node and Deno examples using this pattern.
+
+```js
+const afrOpts = {port: 23456}
+const dirs = [a.dir('target')]
+
+// Call this when your server starts.
+async function watch() {
+  // May cause connected clients to immediately reload.
+  a.maybeSend(a.change, afrOpts)
+
+  // Watch files and notify clients about changes that don't involve restarting
+  // the server, for example in CSS files.
+  for await (const msg of a.watch('target', dirs, {recursive: true})) {
+    await a.send(msg, afrOpts)
+  }
+}
+```
+
+### `function maybeSend(msg, opts)`
+
+Same as [`send`](#function-sendmsg-opts), but ignores any connection errors.
+
+### `function watch(path, dirs, opts)`
+
+Wraps `'fs/promises'.watch` (Node) or `Deno.watchFs` (Deno), converting FS events into messages understood by `client.mjs`.
+
+`path` and `opts` are passed directly to the underlying FS watch API. `dirs` must be an array of [`Dir`](#class-dirpath-filter); they're used to convert absolute FS paths to relative URL paths, and to filter events via `dir.allow`.
+
+To ignore certain paths, use dir filters; see [`Dir`](#class-dirpath-filter).
+
+The resulting messages can be broadcast to connected clients via `bro.send` (when using a [broadcaster](#class-broadopts) in the same process) or [`send`](#function-sendmsg-opts) (when using an external process).
+
+For cancelation, pass `opts.signal` which must be an `AbortSignal`, and later abort it. In Deno, you can also call `.return()` on the resulting iterator.
 
 Example:
 
 ```js
-// Dirs for serving, but not watching.
-const pubDirs = afr.dirs(
-  afr.dir('target'),
-  afr.dir('static'),
-  afr.dir('.', /^(?:images|scripts|node_modules)[/]/),
-)
+const dirs = [a.dir('target'), a.dir('.', /[.]mjs$/)]
 
-// Dirs for watching, but not serving.
-const watchDirs = afr.dirs(
-  afr.dir('scripts'),
-  afr.dir('static'),
-  afr.dir('target'),
-)
-
-async function onListen(err) {
-  afr.onListen(srv, err)
-
-  // See the example "Server Restart Signal" for an explanation.
-  afr.daemonStart()
-  afr.daemonMaybeSend(afr.change)
-
-  // On changes to these dirs, notify connected clients.
-  // This may reinject CSS or reload pages.
-  watchDirs.watchMsg(afr.wat(), {}, afr.daemonMaybeSend)
+for await (const msg of a.watch('.', dirs, {recursive: true})) {
+  await a.send(msg, afrOpts)
 }
+```
 
-async function onRequest(req, res) {
-  // Try to serve a file from any of the specified directories, falling back
-  // on `.html` and `index.html` if possible. You can also use `handleFile`
-  // to avoid the fallbacks.
-  //
-  // If true, a file has been found and served.
-  if (await pubDirs.handleSite(req, res)) return
+### `function serveFile`
 
-  // Your own handling.
+Signature in Node: `serveFile(req, res, dirs, opts)`.
+
+Signature in Deno: `serveFile(req, dirs, opts)`.
+
+Tries to find and serve a file specified by `req.url`. Asynchronously returns `true` if a file was successfully found and served, otherwise `false`.
+
+`dirs` must be an array of [`Dir`](#class-dirpath-filter). They're used as simultaneously mount points and whitelist. For each dir, `req.url` is resolved relative to that directory, and only the paths "allowed" by its filter may be served. Unlike most file-serving libraries, this allows you to easily and _safely_ serve files out of `.`. In addition, this will automatically reject paths containing `..`.
+
+Has limited `content-type` detection. If `opts.headers` don't already include `content-type`, tries to guess it by file extension. Known content types are stored in the `contentTypes` dictionary (exported but undocumented), which you can import and mutate.
+
+In Node:
+
+```js
+const dirs = [a.dir('target'), a.dir('.', /[.]html$/)]
+
+async function respond(req, res) {
+  if (await a.serveFile(req, res, dirs)) return
+
   res.writeHead(404)
   res.end('not found')
 }
 ```
 
-### `class Watcher`
-
-Lower-level tool for watching multiple directories. It exists because Node currently doesn't have such an API built-in. `fs.watch` takes only one directory, and the watcher it returns can't "add" more. `Watcher` fills this gap: call `.watch` to add more, and `.deinit` to close all.
+In Deno:
 
 ```js
-const wat = afr.wat()
+const dirs = [a.dir('target'), a.dir('.', /[.]html$/)]
 
-wat.watch('target', {}, onFsEvent)
-wat.watch('static', {}, onFsEvent)
-wat.deinit()
-
-function onFsEvent(type, path) {}
-```
-
-Instead of this, you should probably make [`Dirs`](#class-dirs) and call `dirs.watch` or `dirs.watchMsg`.
-
-### `serveFile(res, httpCode, fsPath)`
-
-Serves a specific file, with the given HTTP status code. Unlike all other file-serving APIs in this library, this one is not speculative: the file must really exist, otherwise you get an error.
-
-To handle a file request speculatively, use `Dir` or `Dirs` and call `.handleFile()` instead.
-
-Guesses `content-type` from the file extension, using the `contentTypes` dictionary, which you can monkey-patch. Doesn't set any other headers.
-
-```js
-async function onRequest(req, res) {
-  try {
-    await afr.serveFile(res, 200, `index.html`)
-  }
-  catch (err) {
-    res.writeHead(500)
-    res.end(err.stack)
-  }
+async function respond(req) {
+  if (await a.serveFile(req, dirs)) return
+  await req.respond({status: 404, body: 'not found'})
 }
 ```
 
-### Daemon Funs
+### `function serveSite`
 
-The following functions can control Afr's tiny daemon from inside your Node process:
+Signature in Node: `serveSite(req, res, dirs, opts)`.
 
-* `daemonExists(opts)`
-* `daemonRestart(opts)`
-* `daemonSend(body, opts)`
-* `daemonMaybeSend(body, opts)`
-* `daemonStart(opts)`
-* `daemonStop(opts)`
+Signature in Deno: `serveSite(req, dirs, opts)`.
 
-All of them are async (return promises). The names should be self-explanatory. They're also exposed via Afr's [CLI](#cli); run `npx afr` for help.
+Same as [`serveSiteWithNotFound`](#function-servesitewithnotfound), but without the `404.html` fallback.
 
-`opts` are optional, and may contain `port` and `timeout`. For sending, opts may also contain `key`. Clients ignore messages whose key doesn't match theirs. This allows multiple apps, connected to the same local daemon, to ignore each other's change notifications. Key is provided to clients by appending `?key=some-key` to the client script URL:
+### `function serveSiteWithNotFound`
 
-```html
-<script type="module" src="http://localhost:23456/client.mjs"></script>
-<script type="module" src="http://localhost:23456/client.mjs?key=some-app"></script>
-```
+Signature in Node: `serveSiteWithNotFound(req, res, dirs, opts)`.
 
-In server code, you mostly want the following:
+Signature in Deno: `serveSiteWithNotFound(req, dirs, opts)`.
+
+Variant of [`serveFile`](#function-servefile) that mimics GitHub Pages, Netlify, and other static-site hosting providers, by trying additional fallbacks when no exact match is found:
+
+  * Try appending `.html`, unless the URL already looks like a file request or ends with `/`.
+  * Try appending `/index.html`, unless the URL already looks like a file request.
+  * Try serving `404.html` with status code 404.
+
+Extremely handy for developing a static site to be served by providers such as GitHub. Check [`examples`](tree/master/examples) for runnable examples.
+
+Asynchronously returns `true` if a file was successfully found and served, otherwise `false`.
+
+In Node:
 
 ```js
-const dirs = afr.dirs(afr.dir('some-dir'), afr.dir('more-dir'))
+const dirs = [a.dir('target'), a.dir('.', /[.]html$/)]
 
-function onListen(err) {
-  afr.onListen(srv, err)
-  afr.daemonStart()
-  afr.daemonMaybeSend(afr.change)
-  dirs.watchMsg(afr.wat(), {}, afr.daemonMaybeSend)
+async function respond(req, res) {
+  if (await a.serveSiteWithNotFound(req, res, dirs)) return
+
+  res.writeHead(404)
+  res.end('not found')
 }
 ```
 
-### Vars
-
-#### `change`
-
-Simplest possible message that causes clients to reload.
-
-#### `contentTypes`
-
-Dictionary of common file extensions and their content types. Embedded in `afr` to avoid dependencies. Monkey-patch it to support more types.
+In Deno:
 
 ```js
-Object.assign(afr.contentTypes, {
-  '.ogg': 'audio/ogg',
-  '.mp3': 'audio/mpeg',
-})
+const dirs = [a.dir('target'), a.dir('.', /[.]html$/)]
+
+async function respond(req) {
+  if (await a.serveSiteWithNotFound(req, dirs)) return
+  await req.respond({status: 404, body: 'not found'})
+}
 ```
 
-#### `defaultPort`
+### `function serveExactFile`
 
-Port on which Afr's optional daemon listens by default. Used by the various daemon funs if port is unspecified.
+Signature in Node: `serveExactFile(req, res, path, opts)`.
 
-## CLI
+Signature in Deno: `serveExactFile(req, path, opts)`.
 
-Afr comes with a tiny CLI (`npx afr`) that lets you check, start, restart, or "talk" to the daemon. It's less than 100 LoC and doesn't incur any dependencies.
+Lower-level tool used by other file-serving functions. Serves a specific file, which _must_ exist in the FS. `path` is anything accepted by the underlying Node/Deno API for opening files; it may be a relative FS path, absolute FS path, or file URL.
 
-This should work out of the box:
+If the file was found and served, returns `true` for consistency with other file-serving functions. Otherwise, throws an exception.
 
-```sh
-npx afr
+Has limited `content-type` detection; see [`serveFile`](#function-servefile) for notes.
+
+**Warning**: this may blindly serve **any** file from the filesystem. _Never_ pass externally-provided paths such as `req.url` to this function. This must be used _only_ for paths that are safe to publicly expose. For serving arbitrary files from a folder, use [`serveFile`](#function-servefile) or [`serveSite`](#function-servesite).
+
+In Node:
+
+```js
+async function respond(req, res) {
+  if (await a.serveFile(req, res, 'index.html')) return
+  if (await a.serveFile(req, res, '404.html', {status: 404})) return
+
+  res.writeHead(404)
+  res.end('not found')
+}
 ```
 
-`npx` is stupidly slow to start. To make this faster, add the following to your shell's pro-file:
+In Deno (stdlib server):
 
-```sh
-export PATH="$PATH:node_modules/.bin"
+```js
+async function respond(req) {
+  if (await a.serveFile(req, 'index.html')) return
+  if (await a.serveFile(req, '404.html', {status: 404})) return
+  await req.respond({status: 404, body: 'not found'})
+}
 ```
 
-Then you can run scripts like Afr's CLI directly, and faster:
+### Undocumented
 
-```sh
-afr
-```
+Some APIs are exported but undocumented to avoid bloating the docs. Check the source files and look for `export`.
 
 ## Known Limitations
 
-Afr is really geared towards being run from inside your Node server. As such, it doesn't currently implement the feature of restarting the server _itself_. This must be done by an external tool, such as `watchexec`. This may change in the future.
+The Deno version assumes you're using the "stdlib" HTTP server. `Deno.serveHttp` is not supported because:
 
-As stated elsewhere in the documentation, Afr's file-serving features are probably not production-grade. It simplifies your environment, but for production, you should serve files via something like Nginx.
+* Responses require a `ReadableStream`; files from `Deno.open` don't implement that yet. We could technically shim it, but that's not our job.
+
+* Could buffer files in RAM, but feels too dirty.
+
+* `req.signal` is not implemented; unclear if we can close files in _all_ cases.
+
+Afr's file-serving features are probably not production-grade. It does take measures to prevent unauthorized access, and does stream instead of buffering, but doesn't support caching headers and etags. However, Afr _does_ expose the lower-level tools allowing you to implement smart, fine-grained caching headers yourself. You can combine `resolveFile` / `serveFsInfo` / `serveExactFile` (some undocumented), adding caching headers based on each file's location and FS info. Different apps might have different caching strategies for different assets. A one-size-fits-all solution provided by most file-serving libraries is usually not the best strategy.
 
 ## Changelog
+
+### `0.3.0`
+
+* Support both Node and Deno.
+* Removed daemon features. Run Afr in foreground, in parallel with your server. Use Make to orchestrate build tasks and sub-processes.
+* Removed `Watcher` class; use `watch` to iterate over FS messages.
+* Removed `Aio`.
+* Removed `Dirs`.
+* Moved IO methods from `Dirs` and `Dir` into plain functions, with some minor renaming.
 
 ### `0.2.3`
 
