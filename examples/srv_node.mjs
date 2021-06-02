@@ -2,16 +2,16 @@ import * as ht from 'http'
 import * as ut from 'util'
 import * as a from '../afr_node.mjs'
 
-const srvOpts = {port: 34567, hostname: 'localhost'}
 const afrOpts = {port: 34566}
+const srvOpts = {port: 34567}
 const dirs = [a.dir('.', /[.]html|css$/)]
 
 const srv = new ht.Server()
 srv.on('request', respond)
 
 async function main() {
-  await ut.promisify(srv.listen).call(srv, srvOpts.port, srvOpts.hostname)
-  console.log(`[srv] listening on http://${srvOpts.hostname}:${srvOpts.port}`)
+  await ut.promisify(srv.listen).call(srv, srvOpts.port)
+  console.log(`[srv] listening on http://localhost:${srvOpts.port}`)
   watch()
   await ut.promisify(srv.once).call(srv, 'close')
 }

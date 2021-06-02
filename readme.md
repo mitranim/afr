@@ -421,6 +421,10 @@ Afr's file-serving features are probably not production-grade. It does take meas
 
 ## Changelog
 
+### `0.3.1`
+
+In Deno, when loading/running Afr by URL, `Broad` should now be able to serve the client script.
+
 ### `0.3.0`
 
 * Support both Node and Deno.

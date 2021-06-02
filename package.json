@@ -1,6 +1,6 @@
 {
   "name": "afr",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "main": "./afr_node.mjs",
   "bin": "./afr_node_cli.mjs",

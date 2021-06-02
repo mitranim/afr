@@ -95,7 +95,6 @@ export function dir(...args) {return new Dir(...args)}
 export class Broad extends s.Broad {
   respond(req) {return super.respond(new Req(req))}
   respondOr404(req) {return super.respondOr404(new Req(req))}
-  fs() {return Deno}
 }
 
 export class Dir extends s.Dir {

@@ -5,7 +5,7 @@
 
 MAKEFLAGS := --silent --always-make
 PAR := $(MAKE) -j 128
-DENO := deno run --watch -A
+DENO := deno run --watch --allow-net --allow-read
 
 default:
 	echo please run 'make example-node' or 'make example-deno'

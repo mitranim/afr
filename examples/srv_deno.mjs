@@ -1,8 +1,8 @@
 import * as hs from 'https://deno.land/std@0.97.0/http/server.ts'
 import * as a from '../afr_deno.mjs'
 
-const srvOpts = {port: 34567, hostname: 'localhost'}
 const afrOpts = {port: 34566}
+const srvOpts = {port: 34567, hostname: 'localhost'}
 const dirs = [a.dir('.', /[.]html|css$/)]
 
 async function main() {

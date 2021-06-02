@@ -1,11 +1,13 @@
+import {main as clientMain} from './client.mjs'
+
 export const defaultNamespace = '/afr/'
 export const defaultHostname = 'localhost'
 export const bufSize = 4096
 export const crlf = '\r\n'
 export const enc = new TextEncoder()
 export const dec = new TextDecoder()
-export const clientScriptPath = new URL('client.mjs', import.meta.url)
 export const change = {type: 'change'}
+export const clientScript = `void ${clientMain.toString()}()`
 
 export const contentTypes = {
   '.css':   'text/css',
@@ -46,6 +48,11 @@ export const corsEventStreamHeaders = {
 export const corsJsonHeaders = {
   ...corsHeaders,
   'content-type': 'application/json',
+}
+
+export const corsJsHeaders = {
+  ...corsHeaders,
+  'content-type': 'application/javascript',
 }
 
 export function send(fetch, body, opts) {
@@ -154,7 +161,6 @@ export class Broad extends Set {
   }
 
   base() {return 'file:'}
-  fs() {throw new ErrOver()}
 
   add(req) {
     validReq(req)
@@ -193,7 +199,7 @@ export class Broad extends Set {
 
   async respondClientFile(req) {
     if (await onlyGet(req)) return true
-    await serveExactFile(this.fs(), req, clientScriptPath, {headers: corsHeaders})
+    req.respond({body: clientScript, headers: corsJsHeaders})
     return true
   }
 
