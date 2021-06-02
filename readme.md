@@ -421,6 +421,10 @@ Afr's file-serving features are probably not production-grade. It does take meas
 
 ## Changelog
 
+### `0.3.2`
+
+Improved the timing of the first response over a new HTTP connection when running via CLI in Node on Windows.
+
 ### `0.3.1`
 
 In Deno, when loading/running Afr by URL, `Broad` should now be able to serve the client script.

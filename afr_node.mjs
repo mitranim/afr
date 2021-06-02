@@ -103,7 +103,7 @@ export class Dir extends s.Dir {
 
 /* Internal Utils */
 
-export async function main({namespace, port, hostname = s.defaultHostname, verbose}) {
+export async function main({namespace, port, hostname, verbose}) {
   const srv = new ht.Server()
   const bro = new Broad({namespace})
 
@@ -112,7 +112,7 @@ export async function main({namespace, port, hostname = s.defaultHostname, verbo
   await ut.promisify(srv.listen).call(srv, port, hostname)
 
   if (verbose) {
-    console.log(`[afr] listening on http://${hostname}:${srv.address().port}`)
+    console.log(`[afr] listening on http://${hostname || 'localhost'}:${srv.address().port}`)
   }
 
   await ut.promisify(srv.once).call(srv, 'close')
