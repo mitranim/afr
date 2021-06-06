@@ -2,15 +2,17 @@
   "parserOptions": {"sourceType": "module"},
   "env": {
     "es2020": true,
-    "browser": true,
-    "node": true
+    "browser": true
+  },
+  "globals": {
+    "Deno": true,
   },
   "rules": {
     "no-restricted-globals": ["error",
       // window (browser)
-      "alert", "blur", "confirm", "event", "fetch", "find", "focus", "history",
+      "alert", "blur", "confirm", "event", "find", "focus", "history",
       "length", "location", "name", "navigator", "open", "parent", "print",
-      "prompt", "scroll", "self", "status", "stop", "top",
+      "prompt", "scroll", "self", "status", "stop", "top", "caches",
       // global (node)
       "root",
       // other

@@ -1,29 +1,12 @@
-# Must be run from this directory (`./examples`):
-#
-#   make example-node
-#   make example-deno
-
 MAKEFLAGS := --silent --always-make
 PAR := $(MAKE) -j 128
-DENO := deno run --watch --allow-net --allow-read
+DENO := deno run --watch --allow-net --allow-read --unstable
 
-default:
-	echo please run 'make example-node' or 'make example-deno'
+example:
+	$(PAR) afr srv
 
-example-node:
-	$(PAR) afr-node srv-node
+afr:
+	$(DENO) ../afr.mjs --port 34566 --verbose true
 
-example-deno:
-	$(PAR) afr-deno srv-deno
-
-afr-node:
-	node ../afr_node.mjs --port 34566 --verbose true
-
-afr-deno:
-	$(DENO) ../afr_deno.mjs --port 34566 --verbose true
-
-srv-node:
-	node srv_node.mjs
-
-srv-deno:
-	$(DENO) srv_deno.mjs
+srv:
+	$(DENO) srv.mjs

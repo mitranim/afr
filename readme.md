@@ -1,6 +1,6 @@
 ## Overview
 
-`afr`: **A**lways **Fr**esh. Tiny library for [Node](https://nodejs.org) and [Deno](https://deno.land) that:
+`afr`: **A**lways **Fr**esh. Tiny library for [Deno](https://deno.land) and [Node](https://nodejs.org) that:
 
 * Reloads pages on changes.
 * Reinjects CSS without reloading.

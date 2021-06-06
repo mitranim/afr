@@ -4,4 +4,3 @@
 !/.*ignore
 !/*.mjs
 !/*.md
-!/package.json

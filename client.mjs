@@ -1,4 +1,4 @@
-export async function main() {
+export function main() {
   const url = new URL(import.meta.url)
   const clientKey = url.searchParams.get('key') || undefined
   const delay = 1024
