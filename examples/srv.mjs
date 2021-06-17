@@ -20,13 +20,15 @@ async function watch() {
 
 async function serveHttp(conn) {
   for await (const event of Deno.serveHttp(conn)) {
-    respond(event).catch(a.logErr)
+    event.respondWith(response(event.request)).catch(a.logErr)
   }
 }
 
-async function respond(event) {
-  if (await a.serveSiteWithNotFound(event, dirs)) return
-  await event.respondWith(new Response('not found', {status: 404}))
+async function response(req) {
+  return (
+    (await a.resSiteWithNotFound(req, dirs)) ||
+    new Response('not found', {status: 404})
+  )
 }
 
 main()

@@ -1,10 +1,10 @@
-#!/usr/bin/env deno run --allow-net --allow-read --unstable
+#!/usr/bin/env -S deno run --allow-net --allow-read --unstable
 
 import {main as clientMain} from './client.mjs'
 
 /* Public API (partially un/documented) */
 
-export const contentTypes = {
+export const contentTypes = Object.assign(Object.create(null), {
   '.css':   'text/css',
   '.gif':   'image/gif',
   '.htm':   'text/html',
@@ -25,7 +25,7 @@ export const contentTypes = {
   '.webp':  'image/webp',
   '.woff':  'font/woff',
   '.woff2': 'font/woff2',
-}
+})
 
 export const change = {type: 'change'}
 
@@ -64,33 +64,28 @@ export async function* watch(target, dirs, opts) {
   }
 }
 
-export function serveFsInfo(event, info, opts) {
-  valid(event, isFetchEvent)
-  validInst(info, FsInfo)
-  return serveExactFile(event, info.url, opts)
+export async function resFile(req, dirs, opts) {
+  validInst(req, Request)
+  const info = await resolveFile(dirs, req.url)
+  return info && resExactFile(info.url, opts)
 }
 
-export async function serveFile(event, dirs, opts) {
-  valid(event, isFetchEvent)
-  const info = await resolveFile(dirs, event.request.url)
-  return (info || false) && serveFsInfo(event, info, opts)
+export async function resSite(req, dirs, opts) {
+  validInst(req, Request)
+  const info = await resolveSiteFile(dirs, req.url)
+  return info && resExactFile(info.url, opts)
 }
 
-export async function serveSite(event, dirs, opts) {
-  valid(event, isFetchEvent)
-  const info = await resolveSiteFile(dirs, event.request.url)
-  return (info || false) && serveFsInfo(event, info, opts)
-}
-
-export async function serveSiteNotFound(event, dirs, opts) {
-  valid(event, isFetchEvent)
+export async function resSiteNotFound(req, dirs, opts) {
+  validInst(req, Request)
   validOpt(opts, isDict)
   const info = await resolveFile(dirs, '404.html')
-  return (info || false) && serveFsInfo(event, info, {...opts, status: 404})
+  return info && resExactFile(info.url, {...opts, status: 404})
 }
 
-export async function serveSiteWithNotFound(event, dirs, opts) {
-  return (await serveSite(event, dirs, opts)) || (await serveSiteNotFound(event, dirs, opts))
+export async function resSiteWithNotFound(req, dirs, opts) {
+  validInst(req, Request)
+  return (await resSite(req, dirs, opts)) || (await resSiteNotFound(req, dirs, opts))
 }
 
 export function resolve(dirs, url) {
@@ -105,30 +100,23 @@ export function resolveSiteFile(dirs, url) {
   return procure(dirs, dirResolveSiteFile, url)
 }
 
-export async function serveExactFile(event, path, opts) {
-  valid(event, isFetchEvent)
-  validOpt(opts, isDict)
-
-  const headers = opts?.headers
-  validOpt(headers, isDict)
-
-  if (!headers?.['content-type']) {
-    const type = contentType(path)
-
-    if (type) {
-      opts = {...opts, headers: {...headers, 'content-type': type}}
-    }
-  }
-
+export async function resExactFile(path, opts) {
   const file = await Deno.open(path)
+
   try {
-    await event.respondWith(new Response(readableStreamFromReader(file, opts), opts))
+    const res = new Response(readableStreamFromReader(file, opts), opts)
+
+    if (!res.headers.get('content-type')) {
+      const type = contentType(path)
+      if (type) res.headers.set('content-type', type)
+    }
+
+    return res
   }
-  finally {
-    try {file.close()}
-    catch (err) {ignore(err)}
+  catch (err) {
+    file.close()
+    throw err
   }
-  return true
 }
 
 export function contentType(path) {
@@ -187,12 +175,12 @@ export class Broad extends Set {
 
     super()
 
-    this.verbose       = verbose
-    this.url           = dirUrl(namespace, this.base())
-    this.urlClientFile = new URL('client.mjs', this.url)
-    this.urlEvents     = new URL('events', this.url)
-    this.urlEvent      = new URL('event', this.url)
-    this.urlSend       = new URL('send', this.url)
+    this.verbose   = verbose
+    this.url       = dirUrl(namespace, this.base())
+    this.urlClient = new URL('client.mjs', this.url)
+    this.urlEvents = new URL('events', this.url)
+    this.urlEvent  = new URL('event', this.url)
+    this.urlSend   = new URL('send', this.url)
   }
 
   get [Symbol.toStringTag]() {return this.constructor.name}
@@ -205,71 +193,55 @@ export class Broad extends Set {
     for (const client of this) await client.write(msg)
   }
 
-  async respondOr404(event) {
-    if (await this.respond(event)) return true
-    await event.respondWith(new Response('not found', {status: 404})).catch(logErr)
-    return true
+  resOr404(req) {
+    return this.res(req) || new Response('not found', {status: 404})
   }
 
-  async respond(event) {
-    valid(event, isFetchEvent)
-    if (await handleNopMethods(event)) return true
+  res(req) {
+    const res = nopMethodRes(req)
+    if (res) return res
 
-    const url = new URL(toPathname(event.request.url), this.base())
+    const url = new URL(toPathname(req.url), this.base())
 
-    if (url.href === this.urlClientFile.href) return this.respondClientFile(event)
-    if (url.href === this.urlEvents.href) return this.respondEvents(event)
-    if (url.href === this.urlEvent.href) return this.respondEvent(event)
-    if (url.href === this.urlSend.href) return this.respondSend(event)
-
-    return false
+    return (
+      url.href === this.urlClient.href ? this.resClient(req) :
+      url.href === this.urlEvents.href ? this.resEvents(req) :
+      url.href === this.urlEvent.href ? this.resEvent(req) :
+      url.href === this.urlSend.href ? this.resSend(req) :
+      undefined
+    )
   }
 
-  async respondClientFile(event) {
-    if (await onlyGet(event)) return true
-    await event.respondWith(new Response(clientScriptBuf, {headers: corsJsHeaders}))
-    return true
+  resClient(req) {
+    return onlyGet(req) || new Response(clientScriptBuf, {headers: corsJsHeaders})
   }
 
-  async respondEvents(event) {
-    if (await onlyGet(event)) return true
-    return this.respondVia(event, this.EventStreamClient, {headers: corsEventStreamHeaders})
+  resEvents(req) {
+    return onlyGet(req) || this.resVia(req, this.EventStreamClient, {headers: corsEventStreamHeaders})
   }
 
-  async respondEvent(event) {
-    if (await onlyGet(event)) return true
-    return this.respondVia(event, this.EventClient, {headers: corsJsonHeaders})
+  resEvent(req) {
+    return onlyGet(req) || this.resVia(req, this.EventClient, {headers: corsJsonHeaders})
   }
 
-  respondVia(event, Client, opts) {
-    const sig = reqSig(event.request)
-    if (sig?.aborted) return true
-
-    const client = new Client(this, sig)
-    const res = new Response(client, opts)
-
-    this.respondToAsync(event, client, res)
-    return true
+  resVia(req, Client, opts) {
+    const sig = req.signal
+    if (sig?.aborted) return undefined
+    return new Response(new Client(this, sig), opts)
   }
 
-  async respondToAsync(event, client, res) {
+  async resSend(req) {
+    const res = onlyPost(req)
+    if (res) return res
+
+    const msg = await req.json()
     try {
-      await event.respondWith(res)
+      await this.send(msg)
+      return new Response(`true`, {headers: corsJsonHeaders})
     }
     catch (err) {
-      client.deinit()
-      if (this.verbose && shouldLogErr(err)) {
-        console.error(`[afr] unexpected error while responding to broadcaster client:`, err)
-      }
+      return errRes(err)
     }
-  }
-
-  async respondSend(event) {
-    if (await onlyPost(event)) return true
-    const msg = await event.request.json()
-    const res = await this.send(msg).then(nopRes, errRes)
-    await event.respondWith(res)
-    return true
   }
 
   add(val) {
@@ -318,7 +290,7 @@ const eventStreamHeaders = {
 
 const jsonHeaders = {'content-type': 'application/json'}
 const jsHeaders = {'content-type': 'application/javascript'}
-const corsJsonHeaders = {...corsHeaders, jsonHeaders}
+const corsJsonHeaders = {...corsHeaders, ...jsonHeaders}
 const corsJsHeaders = {...corsHeaders, ...jsHeaders}
 const corsEventStreamHeaders = {...corsHeaders, ...eventStreamHeaders}
 
@@ -333,7 +305,7 @@ export async function main({namespace, hostname = defaultHostname, verbose, ...o
   async function serveHttp(conn) {
     for await (const event of Deno.serveHttp(conn)) {
       try {
-        await bro.respondOr404(event)
+        await event.respondWith(bro.resOr404(event.request))
       }
       catch (err) {
         if (verbose && shouldLogErr(err)) {
@@ -524,10 +496,6 @@ export async function procure(dirs, fun, ...args) {
   }
 
   return undefined
-}
-
-function isFetchEvent(val) {
-  return isComp(val) && isFun(val.respondWith) && isInst(val.request, Request)
 }
 
 export function readableStreamFromReader(reader, opts) {
@@ -731,25 +699,21 @@ export function errRes(err) {
   return new Response(msg, {status: 500})
 }
 
-async function handleNopMethods(event) {
-  const {method} = event.request
-  if (method === 'HEAD' || method === 'OPTIONS') {
-    await event.respondWith(new Response())
-    return true
-  }
-  return false
+function nopMethodRes({method}) {
+  return method === 'HEAD' || method === 'OPTIONS' ? nopRes() : undefined
 }
 
-function onlyMethod(event, method) {
-  return event.request.method !== method && methodNotAllowed(event)
+function onlyMethod(req, method) {
+  return req.method !== method ? resMethodNotAllowed(req) : undefined
 }
 
-function onlyGet(event) {return onlyMethod(event, 'GET')}
-function onlyPost(event) {return onlyMethod(event, 'POST')}
+function onlyGet(req) {return onlyMethod(req, 'GET')}
+function onlyPost(req) {return onlyMethod(req, 'POST')}
 
-async function methodNotAllowed(event) {
-  await event.respondWith(new Response(undefined, {status: 405}))
-  return true
+function resMethodNotAllowed(req) {
+  const {method, url} = req
+  const {pathname} = new URL(url)
+  return new Response(`method ${method} not allowed for path ${pathname}`, {status: 405})
 }
 
 export function logErr(err) {
@@ -781,7 +745,8 @@ async function resOk(res) {
 }
 
 function resBody(res) {
-  if (/application[/]json/.test(res.headers.get('content-type'))) {
+  const type = res.headers.get('content-type')
+  if (type && /\bapplication[/]json\b/.test(type)) {
     return res.json()
   }
   return res.text()
@@ -821,11 +786,6 @@ function maybeJsonParse(val) {
     if (err.name === 'SyntaxError') return val
     throw err
   }
-}
-
-function reqSig(req) {
-  try {return req?.signal}
-  catch (__) {return undefined}
 }
 
 // Normalize to the types emitted by Node and understood by our client.
