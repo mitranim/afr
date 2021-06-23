@@ -78,7 +78,7 @@ This library is born from frustrations with Browsersync and other related tools.
 ### As Library
 
 ```js
-import * as a from 'https://deno.land/x/afr@0.4.0/afr.mjs'
+import * as a from 'https://deno.land/x/afr@0.4.1/afr.mjs'
 ```
 
 ### As CLI
@@ -86,7 +86,7 @@ import * as a from 'https://deno.land/x/afr@0.4.0/afr.mjs'
 Put this in a makefile, and run concurrently with your server. See [examples](#examples).
 
 ```sh
-deno run --allow-net --allow-read --unstable https://deno.land/x/afr@0.4.0/afr.mjs --port 23456 --verbose true
+deno run --allow-net --allow-read --unstable https://deno.land/x/afr@0.4.1/afr.mjs --port 23456 --verbose true
 ```
 
 ## Examples

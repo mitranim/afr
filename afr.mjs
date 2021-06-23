@@ -607,7 +607,7 @@ export function loc({url, port, hostname = defaultHostname, namespace = defaultN
 
 function ext(path) {
   valid(path, isStr)
-  return path.match(/(?:[^\\/])([.][^:\\/]+)$/)?.[1] || ''
+  return path.match(/[^\\/]([.]\w+)$/)?.[1] || ''
 }
 
 function relPathname(val) {
