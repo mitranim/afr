@@ -13,9 +13,9 @@ Two components:
   * Used inside your server, or via optional CLI.
   * Notifies clients.
   * Notification can be triggered by HTTP request from another process.
-    * Allows page reload _immediately_ after server restart. See [`examples`](tree/master/examples).
+    * Allows page reload _immediately_ after server restart. See [`examples`](examples).
 * Client component:
-  * Tiny [script](blob/master/client.mjs).
+  * Tiny [script](client.mjs).
   * Listens for server notifications.
   * Reinjects CSS without reloading. Reloads on other changes.
 
@@ -91,7 +91,7 @@ deno run --allow-net --allow-read --unstable https://deno.land/x/afr@0.4.1/afr.m
 
 ## Examples
 
-Runnable example: clone this repo, `cd` to [`examples`](tree/master/examples), and run `make`.
+Runnable example: clone this repo, `cd` to [`examples`](examples), and run `make`.
 
 ## API
 
@@ -177,7 +177,7 @@ Broadcasts `msg` to Afr clients. Assumes that on `opts.url` or `opts.hostname + 
 
 This is useful when running Afr and your own server in separate processes. This allows clients to stay connected when your server restarts, and immediately reload when it's ready.
 
-See the [`examples`](tree/master/examples) folder for a runnable example using this pattern.
+See the [`examples`](examples) folder for a runnable example using this pattern.
 
 ```js
 const afrOpts = {port: 23456}
@@ -277,7 +277,7 @@ Variant of [`resFile`](#function-resfilereq-dirs-opts) that mimics GitHub Pages,
   * Try appending `/index.html`, unless the URL already looks like a file request.
   * Try serving `404.html` with status code 404.
 
-Extremely handy for developing a static site to be served by providers such as GitHub. Check [`examples`](tree/master/examples) for runnable examples.
+Extremely handy for developing a static site to be served by providers such as GitHub. Check [`examples`](examples) for runnable examples.
 
 ```js
 const dirs = [a.dir('target'), a.dir('.', /[.]html$/)]
