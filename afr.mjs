@@ -1,5 +1,7 @@
 #!/usr/bin/env -S deno run --allow-net --allow-read --unstable
 
+/* global Deno */
+
 import {main as clientMain} from './client.mjs'
 
 /* Public API (partially un/documented) */

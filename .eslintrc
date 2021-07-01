@@ -4,9 +4,6 @@
     "es2020": true,
     "browser": true
   },
-  "globals": {
-    "Deno": true,
-  },
   "rules": {
     "no-restricted-globals": ["error",
       // window (browser)
