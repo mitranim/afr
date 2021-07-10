@@ -78,7 +78,7 @@ This library is born from frustrations with Browsersync and other related tools.
 ### As Library
 
 ```js
-import * as a from 'https://deno.land/x/afr@0.4.1/afr.mjs'
+import * as a from 'https://deno.land/x/afr@0.4.2/afr.mjs'
 ```
 
 ### As CLI
@@ -86,7 +86,7 @@ import * as a from 'https://deno.land/x/afr@0.4.1/afr.mjs'
 Put this in a makefile, and run concurrently with your server. See [examples](#examples).
 
 ```sh
-deno run --allow-net --allow-read --unstable https://deno.land/x/afr@0.4.1/afr.mjs --port 23456 --verbose true
+deno run --allow-net --allow-read --unstable https://deno.land/x/afr@0.4.2/afr.mjs --port 23456 --verbose true
 ```
 
 ## Examples
@@ -325,6 +325,14 @@ Afr's file-serving features are probably not production-grade. It _does_ take me
 No TypeScript yet. May convert in later versions.
 
 ## Changelog
+
+### `0.4.2`
+
+"File response" functions now return responses only for GET.
+
+### `0.4.1`
+
+Corrected file extension parsing.
 
 ### `0.4.0`
 

@@ -68,12 +68,14 @@ export async function* watch(target, dirs, opts) {
 
 export async function resFile(req, dirs, opts) {
   validInst(req, Request)
+  if (!isGet(req)) return undefined
   const info = await resolveFile(dirs, req.url)
   return info && resExactFile(info.url, opts)
 }
 
 export async function resSite(req, dirs, opts) {
   validInst(req, Request)
+  if (!isGet(req)) return undefined
   const info = await resolveSiteFile(dirs, req.url)
   return info && resExactFile(info.url, opts)
 }
@@ -81,6 +83,7 @@ export async function resSite(req, dirs, opts) {
 export async function resSiteNotFound(req, dirs, opts) {
   validInst(req, Request)
   validOpt(opts, isDict)
+  if (!isGet(req)) return undefined
   const info = await resolveFile(dirs, '404.html')
   return info && resExactFile(info.url, {...opts, status: 404})
 }
@@ -200,7 +203,7 @@ export class Broad extends Set {
   }
 
   res(req) {
-    const res = nopMethodRes(req)
+    const res = preflightRes(req)
     if (res) return res
 
     const url = new URL(toPathname(req.url), this.base())
@@ -701,12 +704,12 @@ export function errRes(err) {
   return new Response(msg, {status: 500})
 }
 
-function nopMethodRes({method}) {
-  return method === 'HEAD' || method === 'OPTIONS' ? nopRes() : undefined
+function preflightRes(req) {
+  return hasMethod(req, 'HEAD') || hasMethod(req, 'OPTIONS') ? nopRes() : undefined
 }
 
 function onlyMethod(req, method) {
-  return req.method !== method ? resMethodNotAllowed(req) : undefined
+  return hasMethod(req, method) ? undefined : resMethodNotAllowed(req)
 }
 
 function onlyGet(req) {return onlyMethod(req, 'GET')}
@@ -717,6 +720,9 @@ function resMethodNotAllowed(req) {
   const {pathname} = new URL(url)
   return new Response(`method ${method} not allowed for path ${pathname}`, {status: 405})
 }
+
+function hasMethod(req, val) {return req.method === val}
+function isGet(req) {return hasMethod(req, 'GET')}
 
 export function logErr(err) {
   if (shouldLogErr(err)) console.error(`[afr]`, err)
