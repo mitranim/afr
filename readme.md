@@ -1,15 +1,16 @@
 ## Overview
 
-`afr`: **A**lways **Fr**esh. Tiny library for [Deno](https://deno.land) that:
+`afr`: **A**lways **Fr**esh. Tiny library for [Deno](https://deno.land). Simple and flexible file server, with optional "live reload" integration for development.
 
-* Reloads pages on changes.
-* Reinjects CSS without reloading.
-* Optionally serves files.
-  * Optionally just like GitHub Pages.
+* Serve from multiple directories.
+* Restrict paths via regexps or functions.
+* Optional: automatic `.html` or `index.html` fallbacks, just like GitHub Pages.
+* Optional: on file changes, reinject CSS or reload page.
 
-Two components:
+Components:
 
-* Server component:
+* Collection of file-serving functions; see [API](#api).
+* Optional broadcaster:
   * Used inside your server, or via optional CLI.
   * Notifies clients.
   * Notification can be triggered by HTTP request from another process.
@@ -22,66 +23,48 @@ Two components:
 Other features:
 
 * Tiny and dependency-free. Being small is a big feature!
-* Doesn't force a separate server. Runs from _within_ your Deno server, without complicating your environment. Optionally, run separately via CLI.
+* Doesn't force a separate server. Runs from _within_ your Deno server, without complicating your environment. Optionally, run a broadcaster separately via CLI.
 * Can signal page reload _after server restart_. Extremely useful when developing a server-rendered app.
   * Implemented by running in a separate process, sending notifications from your main server process.
   * Accepts signals over HTTP, which can be sent from any process, from any language.
-* Serves static files with a flexible directory configuration. Allows multiple paths with filters.
 
-Super-lightweight alternative to Browsersync, Livereload, and file-serving libraries.
+Super-lightweight alternative to other file-serving libraries, and also to tools like Browsersync, Livereload, etc.
 
 **This readme is for Deno.** For Node support, see [`afr@0.3.2`](https://github.com/mitranim/afr/blob/ef96d7daa0e6d1540e54e43c5e295521e95ab020/readme.md).
 
 ## TOC
 
-* [Why](#why)
 * [Usage](#usage)
   * [As Library](#as-library)
   * [As CLI](#as-cli)
 * [Examples](#examples)
 * [API](#api)
-  * [`class Broad`](#class-broadopts)
   * [`class Dir`](#class-dirpath-filter)
-  * [`function send`](#function-sendmsg-opts)
-  * [`function maybeSend`](#function-maybesendmsg-opts)
-  * [`function watch`](#function-watchpath-dirs-opts)
   * [`function resFile`](#function-resfilereq-dirs-opts)
   * [`function resSite`](#function-ressitereq-dirs-opts)
   * [`function resSiteWithNotFound`](#function-ressitewithnotfoundreq-dirs-opts)
   * [`function resExactFile`](#function-resexactfilepath-opts)
+  * [`class Broad`](#class-broadopts)
+  * [`function send`](#function-sendmsg-opts)
+  * [`function maybeSend`](#function-maybesendmsg-opts)
+  * [`function watch`](#function-watchpath-dirs-opts)
   * [Undocumented](#undocumented)
 * [Known Limitations](#known-limitations)
 * [Misc](#misc)
 
-## Why
-
-This library is born from frustrations with Browsersync and other related tools. Advantages:
-
-* Very small, simple, fast.
-* No dependencies, rather than customary **tens of megabytes**.
-* Doesn't require its own server; plugs into yours.
-  * Doesn't infect your stack with junk.
-* Silent, doesn't spam your terminal with crap.
-* No forced delays.
-* Compatible with plain Deno servers. **No** framework junk.
-  * Uses the built-in HTTP API, which is currently considered unstable.
-* Injected CSS doesn't have long-ass names.
-* Failing webpage requests don't get stuck forever.
-* Reliable: if the server is running, the client is connected.
-* Can reload pages immediately after server restart.
-* Built-in file server.
-  * Optionally compatible with GitHub Pages rules.
-* ... probably more that I'm forgetting to mention.
-
 ## Usage
 
 ### As Library
+
+See the API below.
 
 ```js
 import * as a from 'https://deno.land/x/afr@0.4.2/afr.mjs'
 ```
 
 ### As CLI
+
+The CLI doesn't serve files. It's a development tool that runs a [broadcaster](#class-broadopts) in a separate process, allowing clients to remain connected, so that your server can signal page reload on restart.
 
 Put this in a makefile, and run concurrently with your server. See [examples](#examples).
 
@@ -94,6 +77,108 @@ deno run --allow-net --allow-read --unstable https://deno.land/x/afr@0.4.2/afr.m
 Runnable example: clone this repo, `cd` to [`examples`](examples), and run `make`.
 
 ## API
+
+### `class Dir(path, filter)`
+
+`ƒ(string|URL, RegExp|(string)=>bool)`
+
+Fundamental tool for serving files and handling FS events. Takes an FS path and an optional filter. For example:
+
+```js
+const dir = a.dir('target', /[.]html|css|mjs$/)
+```
+
+Many Afr functions require an array of dirs:
+
+```js
+const dirs = [
+  a.dir('target'),
+  a.dir('.', /[.]html|css|mjs$/),
+]
+```
+
+The filter may be either a regexp or a function. Afr applies it to a path that is Posix-style (`/`-separated), relative to the dir, and _not_ URL-encoded. Dirs without a filter are permissive and "allow" any sub-path when asked.
+
+```js
+const dirs = [
+  a.dir('target'),
+  a.dir('.', /^static|images|scripts[/]/),
+]
+```
+
+### `function resFile(req, dirs, opts)`
+
+`ƒ(Request, []Dir, ResponseInit) -> Promise<Response | undefined>`
+
+Tries to serve a file specified by `req.url` from `dirs`.
+
+`dirs` must be an array of [`Dir`](#class-dirpath-filter). They're used as mount points _and_ filters. For each dir, `req.url` is resolved relative to that directory, and only the paths "allowed" by its filter may be served. Unlike most file-serving libraries, this allows you to easily and _safely_ serve files out of `.`. In addition, this will automatically reject paths containing `..`.
+
+Has limited `content-type` detection; see [`resExactFile`](#function-resexactfilepath-opts) for details.
+
+File closing should be automatic; see [`resExactFile`](#function-resexactfilepath-opts) for details.
+
+```js
+const dirs = [a.dir('target'), a.dir('.', /[.]html$/)]
+
+async function response(req) {
+  return (
+    (await a.resFile(req, dirs)) ||
+    new Response('not found', {status: 404})
+  )
+}
+```
+
+### `function resSite(req, dirs, opts)`
+
+`ƒ(Request, []Dir, ResponseInit) -> Promise<Response | undefined>`
+
+Same as [`resSiteWithNotFound`](#function-ressitewithnotfoundreq-dirs-opts), but without the `404.html` fallback.
+
+### `function resSiteWithNotFound(req, dirs, opts)`
+
+`ƒ(Request, []Dir, ResponseInit) -> Promise<Response | undefined>`
+
+Variant of [`resFile`](#function-resfilereq-dirs-opts) that mimics GitHub Pages, Netlify, and other static-site hosting providers, by trying additional fallbacks when no exact match is found:
+
+  * Try appending `.html`, unless the URL already looks like a file request or ends with `/`.
+  * Try appending `/index.html`, unless the URL already looks like a file request.
+  * Try serving `404.html` with status code 404.
+
+Extremely handy for developing a static site to be served by providers such as GitHub. Check [`examples`](examples) for runnable examples.
+
+```js
+const dirs = [a.dir('target'), a.dir('.', /[.]html$/)]
+
+async function response(req) {
+  return (
+    (await a.resSiteWithNotFound(req, dirs)) ||
+    new Response('not found', {status: 404})
+  )
+}
+```
+
+### `function resExactFile(path, opts)`
+
+`ƒ(string|URL, ResponseInit) -> Promise<Response>`
+
+Lower-level tool used by other file-serving functions. Serves a specific file, which _must_ exist in the FS. `path` is anything accepted by `Deno.open`; it may be a relative FS path, absolute FS path, or file URL.
+
+Has limited `content-type` detection. If `opts.headers` doesn't already include `content-type`, tries to guess it by file extension. Known content types are stored in the `contentTypes` dictionary (exported but undocumented), which you can import and mutate.
+
+**Warning**: this keeps the file open until the stream is fully read, or until `res.body.cancel()`. Both are handled automatically by Deno when serving the response, but it's _your_ responsibility to immediately start serving this response. Otherwise the file descriptor may leak.
+
+**Warning**: this may blindly serve **any** file from the filesystem. _Never_ pass externally-provided paths such as `req.url` to this function. This must be used _only_ for paths that are safe to publicly expose. For serving arbitrary files from a folder, use [`resFile`](#function-resfilereq-dirs-opts) or [`resSite`](#function-ressitereq-dirs-opts).
+
+```js
+async function response() {
+  return (
+    (await a.resExactFile('index.html')) ||
+    (await a.resExactFile('404.html', {status: 404})) ||
+    new Response('not found', {status: 404})
+  )
+}
+```
 
 ### `class Broad(opts)`
 
@@ -131,34 +216,6 @@ async function change() {
 ```
 
 Running Afr [as a CLI](#as-cli) starts an HTTP server that handles all requests using a [`Broad`](#class-broadopts) instance and responds with 404 to everything unknown.
-
-### `class Dir(path, filter)`
-
-`ƒ(string|URL, RegExp|(string)=>bool)`
-
-Fundamental tool for serving files and handling FS events. Takes an FS path and an optional filter. For example:
-
-```js
-const dir = a.dir('target', /[.]html|css|mjs$/)
-```
-
-Many Afr functions require an array of dirs:
-
-```js
-const dirs = [
-  a.dir('target'),
-  a.dir('.', /[.]html|css|mjs$/),
-]
-```
-
-The filter may be either a regexp or a function. Afr applies it to a path that is Posix-style (`/`-separated), relative to the dir, and _not_ URL-encoded. Dirs without a filter are permissive and "allow" any sub-path when asked.
-
-```js
-const dirs = [
-  a.dir('target'),
-  a.dir('.', /^static|images|scripts[/]/),
-]
-```
 
 ### `function send(msg, opts)`
 
@@ -238,80 +295,6 @@ for await (const msg of a.watch('.', dirs, {recursive: true})) {
 }
 ```
 
-### `function resFile(req, dirs, opts)`
-
-`ƒ(Request, []Dir, ResponseInit) -> Promise<Response | undefined>`
-
-Tries to serve a file specified by `req.url` from `dirs`.
-
-`dirs` must be an array of [`Dir`](#class-dirpath-filter). They're used as mount points _and_ filters. For each dir, `req.url` is resolved relative to that directory, and only the paths "allowed" by its filter may be served. Unlike most file-serving libraries, this allows you to easily and _safely_ serve files out of `.`. In addition, this will automatically reject paths containing `..`.
-
-Has limited `content-type` detection; see [`resExactFile`](#function-resexactfilepath-opts) for details.
-
-File closing should be automatic; see [`resExactFile`](#function-resexactfilepath-opts) for details.
-
-```js
-const dirs = [a.dir('target'), a.dir('.', /[.]html$/)]
-
-async function response(req) {
-  return (
-    (await a.resFile(req, dirs)) ||
-    new Response('not found', {status: 404})
-  )
-}
-```
-
-### `function resSite(req, dirs, opts)`
-
-`ƒ(Request, []Dir, ResponseInit) -> Promise<Response | undefined>`
-
-Same as [`resSiteWithNotFound`](#function-ressitewithnotfoundreq-dirs-opts), but without the `404.html` fallback.
-
-### `function resSiteWithNotFound(req, dirs, opts)`
-
-`ƒ(Request, []Dir, ResponseInit) -> Promise<Response | undefined>`
-
-Variant of [`resFile`](#function-resfilereq-dirs-opts) that mimics GitHub Pages, Netlify, and other static-site hosting providers, by trying additional fallbacks when no exact match is found:
-
-  * Try appending `.html`, unless the URL already looks like a file request or ends with `/`.
-  * Try appending `/index.html`, unless the URL already looks like a file request.
-  * Try serving `404.html` with status code 404.
-
-Extremely handy for developing a static site to be served by providers such as GitHub. Check [`examples`](examples) for runnable examples.
-
-```js
-const dirs = [a.dir('target'), a.dir('.', /[.]html$/)]
-
-async function response(req) {
-  return (
-    (await a.resSiteWithNotFound(req, dirs)) ||
-    new Response('not found', {status: 404})
-  )
-}
-```
-
-### `function resExactFile(path, opts)`
-
-`ƒ(string|URL, ResponseInit) -> Promise<Response>`
-
-Lower-level tool used by other file-serving functions. Serves a specific file, which _must_ exist in the FS. `path` is anything accepted by `Deno.open`; it may be a relative FS path, absolute FS path, or file URL.
-
-Has limited `content-type` detection. If `opts.headers` doesn't already include `content-type`, tries to guess it by file extension. Known content types are stored in the `contentTypes` dictionary (exported but undocumented), which you can import and mutate.
-
-**Warning**: this keeps the file open until the stream is fully read, or until `res.body.cancel()`. Both are handled automatically by Deno when serving the response, but it's _your_ responsibility to immediately start serving this response. Otherwise the file descriptor may leak.
-
-**Warning**: this may blindly serve **any** file from the filesystem. _Never_ pass externally-provided paths such as `req.url` to this function. This must be used _only_ for paths that are safe to publicly expose. For serving arbitrary files from a folder, use [`resFile`](#function-resfilereq-dirs-opts) or [`resSite`](#function-ressitereq-dirs-opts).
-
-```js
-async function response() {
-  return (
-    (await a.resExactFile('index.html')) ||
-    (await a.resExactFile('404.html', {status: 404})) ||
-    new Response('not found', {status: 404})
-  )
-}
-```
-
 ### Undocumented
 
 Some APIs are exported but undocumented to avoid bloating the docs. Check the source files and look for `export`.
@@ -320,9 +303,19 @@ Some APIs are exported but undocumented to avoid bloating the docs. Check the so
 
 Supports only the built-in Deno HTTP server. For stdlib support, use [`afr@0.3.2`](https://github.com/mitranim/afr/blob/ef96d7daa0e6d1540e54e43c5e295521e95ab020/readme.md).
 
-Afr's file-serving features are probably not production-grade. It _does_ take measures to prevent unauthorized access, and _does_ stream instead of buffering, but does _not_ support automatic cache headers and etags. However, Afr _does_ help you implement smart, fine-grained caching headers yourself. You can combine `resolveFile` (undocumented) and [`resExactFile`](#function-resexactfilepath-opts), adding caching headers based on each file's location and FS info. Different apps might have different caching strategies for different assets. A one-size-fits-all solution provided by most file-serving libraries is usually not the best strategy.
+No TypeScript. May convert in later versions.
 
-No TypeScript yet. May convert in later versions.
+No compression support. Put your Deno server behind a reverse proxy, such as Nginx, configured for compression.
+
+No default HTTP cache headers. Caching strategies may vary. You should add your own cache headers. Afr makes it easy:
+
+```js
+function respond(req) {return a.resFile(req, dirs, fileInit)}
+
+const fileInit = {headers: {'cache-control': 'max-age=31536000'}}
+```
+
+For etag support, use slightly lower-level tools. Use the undocumented function `resolveFile` to get FS stats, generate an etag from that, then serve via `resExactFile`.
 
 ## Changelog
 
