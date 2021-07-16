@@ -82,7 +82,6 @@ export class Broad extends Set<BroadClient> {
 
   resSend(req: Request): Promise<Response>
 
-  /* TODO: return this in afr */
   add(val: BroadClient): this
 
   clear(): void

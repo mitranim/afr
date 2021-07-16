@@ -252,7 +252,7 @@ export class Broad extends Set {
 
   add(val) {
     validInst(val, BroadClient)
-    super.add(val)
+    return super.add(val)
   }
 
   clear() {
