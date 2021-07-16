@@ -1,4 +1,5 @@
 #!/usr/bin/env -S deno run --allow-net --allow-read --unstable
+/// <reference types="./afr.d.ts" />
 
 /* global Deno */
 
