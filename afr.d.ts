@@ -2,27 +2,27 @@ export const contentTypes: Readonly<Record<string, string>>
 
 export const change: WatchResItem
 
-type SendOpts = LocParams & Omit<RequestInit, 'method' | 'body'>
+export type SendOpts = LocParams & Omit<RequestInit, 'method' | 'body'>
 
 export function send<T>(body: WatchResItem, opts?: SendOpts): Promise<T>
 
 export const maybeSend: typeof send;
 
-type WatchType = Omit<Deno.FsEvent, 'modify'> & 'change'
+export type WatchType = Omit<Deno.FsEvent, 'modify'> & 'change'
 
-interface WatchOpts {
+export interface WatchOpts {
   signal?: AbortSignal,
   recursive: boolean,
 }
 
-interface WatchResItem {
+export interface WatchResItem {
   type: WatchType,
   path?: string,
 }
 
 export function watch(target: string, dirs: Dir[], opts?: WatchOpts): AsyncGenerator<WatchResItem>
 
-interface ResExactFileOpts extends ResponseInit, ReadableStreamFromReaderOpts {}
+export interface ResExactFileOpts extends ResponseInit, ReadableStreamFromReaderOpts {}
 
 export function resFile(req: Request, dirs: Dir[], opts?: ResExactFileOpts): Promise<Response | undefined>
 export const resSite: typeof resFile
@@ -41,7 +41,7 @@ export function clientPath(opts: LocParams): URL
 
 export function dir(path: string, test?: DirTest): Dir
 
-type DirTest = RegExp | ((path: string) => boolean)
+export type DirTest = RegExp | ((path: string) => boolean)
 
 export class Dir {
   constructor(path: string, test?: DirTest)
@@ -57,7 +57,7 @@ export class Dir {
   rel(url: URL): string
 }
 
-interface BroadParams {
+export interface BroadParams {
   namespace?: string,
   verbose?: boolean,
 }
@@ -139,11 +139,11 @@ export function procure<
   ...args: [A1?, A2?, A3?, A4?, A5?, A6?, A7?, A8?, A9?]
 ): Promise<ReturnType<Fn> | undefined>
 
-interface ReadableStreamFromReaderOpts { chunkSize?: number }
+export interface ReadableStreamFromReaderOpts { chunkSize?: number }
 
 export function readableStreamFromReader(reader: Deno.Reader, opts?: ReadableStreamFromReaderOpts): ReadableStream<Uint8Array>
 
-interface LocParams {
+export interface LocParams {
   url?: string | URL,
   port: number,
   hostname?: string,
