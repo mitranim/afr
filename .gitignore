@@ -2,6 +2,6 @@
 !/examples
 !/.*rc
 !/.*ignore
-!/*.d.ts
+!/*.ts
 !/*.mjs
 !/*.md
