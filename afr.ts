@@ -514,15 +514,15 @@ export async function dirResolveSiteFile(dir: Dir, url: string | URL) {
   url = dir.resolveUrl(url)
 
   return (
-    (await dirResolveFile(dir, url))
-    || (!ext(url.pathname) && (
+    (await dirResolveFile(dir, url)) ||
+    (ext(url.pathname) ? undefined : (
       (
-        !url.pathname.endsWith('/')
-        && (await dirResolveFile(dir, urlMut(url, add, '.html')))
+        url.pathname.endsWith('/')
+        ? undefined
+        : (await dirResolveFile(dir, urlMut(url, add, '.html')))
       )
       || (await dirResolveFile(dir, relUrl('index.html', url)))
     ))
-    || undefined
   )
 }
 
