@@ -540,8 +540,8 @@ export async function fsMaybeStat(path: string | URL) {
 export async function procure<
   R,
   A,
-  F extends (dir: Dir, ...args: A[]) => Promise<R | undefined>,
->(dirs: Dir[], fun: F, ...args: A[]): Promise<R | undefined> {
+  F extends (dir: Dir, ...args: [A]) => Promise<R | undefined>,
+>(dirs: Dir[], fun: F, ...args: [A]): Promise<R | undefined> {
   validEachInst(dirs, Dir)
   valid(fun, isFun)
 

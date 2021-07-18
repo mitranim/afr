@@ -321,6 +321,10 @@ For etag support, use slightly lower-level tools. Use the undocumented function 
 
 ## Changelog
 
+### `0.5.0`
+
+Now written in TS.
+
 ### `0.4.2`
 
 "File response" functions now return responses only for GET.
