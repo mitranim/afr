@@ -6,7 +6,7 @@ import {main as clientMain} from './client.mjs'
 
 /* Public API (partially un/documented) */
 
-export const contentTypes: Readonly<Record<string, string>> = {
+export const contentTypes: Record<string, string> = Object.assign(Object.create(null), {
   '.css':   'text/css',
   '.gif':   'image/gif',
   '.htm':   'text/html',
@@ -27,13 +27,15 @@ export const contentTypes: Readonly<Record<string, string>> = {
   '.webp':  'image/webp',
   '.woff':  'font/woff',
   '.woff2': 'font/woff2',
-}
+} as Record<string, string>)
 
-export const change = {type: 'change'} as const
+export const change: SendBody = {type: 'change'} as const
 
-export type SendOpts = LocParams & Omit<RequestInit, 'method' | 'body'>
+export type SendBody = WatchMsg | {type: string}
+export type SendOpts = LocOpts & Omit<RequestInit, 'method' | 'body'>
+export type AnyData = unknown
 
-export function send(body: WatchResItem, opts: SendOpts): Promise<Record<string, unknown> | string> {
+export function send(body: SendBody, opts: SendOpts) {
   valid(body, isDict)
   valid(opts, isDict)
 
@@ -43,23 +45,26 @@ export function send(body: WatchResItem, opts: SendOpts): Promise<Record<string,
   return fetch(url, fetchOpts).then(resOkBody)
 }
 
-export function maybeSend(body: WatchResItem, opts: SendOpts) {
+export function maybeSend(body: SendBody, opts: SendOpts) {
   return send(body, opts).catch(logErr)
 }
 
+// The weird remapping is Node legacy and may be changed in the future.
 export type WatchType = Omit<Deno.FsEvent['kind'], 'modify'> | 'change'
 
 export interface WatchOpts {
-  signal?: AbortSignal,
-  recursive: boolean,
+  signal?: AbortSignal
+  recursive: boolean
 }
 
-export interface WatchResItem {
-  type: WatchType,
-  path?: string,
+export interface WatchMsg {
+  type: WatchType
+  path: string
 }
 
-export async function* watch(target: string, dirs: Dir[], opts?: WatchOpts): AsyncGenerator<WatchResItem> {
+export type WatchTarget = string | string[]
+
+export async function* watch(target: WatchTarget, dirs: Dir[], opts?: WatchOpts): AsyncGenerator<WatchMsg> {
   validEachInst(dirs, Dir)
 
   for await (const {kind, paths} of watchFs(target, opts)) {
@@ -80,21 +85,21 @@ export async function* watch(target: string, dirs: Dir[], opts?: WatchOpts): Asy
   }
 }
 
-export async function resFile(req: Request, dirs: Dir[], opts?: ResExactFileOpts) {
+export async function resFile(req: Request, dirs: Dir[], opts?: FileOpts) {
   validInst(req, Request)
   if (!isGet(req)) return undefined
   const info = await resolveFile(dirs, req.url)
   return info && resExactFile(info.url, opts)
 }
 
-export async function resSite(req: Request, dirs: Dir[], opts?: ResExactFileOpts) {
+export async function resSite(req: Request, dirs: Dir[], opts?: FileOpts) {
   validInst(req, Request)
   if (!isGet(req)) return undefined
   const info = await resolveSiteFile(dirs, req.url)
   return info && resExactFile(info.url, opts)
 }
 
-export async function resSiteNotFound(req: Request, dirs: Dir[], opts?: ResExactFileOpts) {
+export async function resSiteNotFound(req: Request, dirs: Dir[], opts?: FileOpts) {
   validInst(req, Request)
   validOpt(opts, isDict)
   if (!isGet(req)) return undefined
@@ -102,7 +107,7 @@ export async function resSiteNotFound(req: Request, dirs: Dir[], opts?: ResExact
   return info && resExactFile(info.url, {...opts, status: 404})
 }
 
-export async function resSiteWithNotFound(req: Request, dirs: Dir[], opts?: ResExactFileOpts) {
+export async function resSiteWithNotFound(req: Request, dirs: Dir[], opts?: FileOpts) {
   validInst(req, Request)
   return (await resSite(req, dirs, opts)) || (await resSiteNotFound(req, dirs, opts))
 }
@@ -119,9 +124,9 @@ export function resolveSiteFile(dirs: Dir[], url: string | URL) {
   return procure(dirs, dirResolveSiteFile, url)
 }
 
-export interface ResExactFileOpts extends ResponseInit, ReadableStreamFromReaderOpts {}
+export interface FileOpts extends ResponseInit, ReadableStreamFromReaderOpts {}
 
-export async function resExactFile(path: string | URL, opts?: ResExactFileOpts) {
+export async function resExactFile(path: string | URL, opts?: FileOpts) {
   const file = await Deno.open(path)
 
   try {
@@ -141,26 +146,25 @@ export async function resExactFile(path: string | URL, opts?: ResExactFileOpts) 
 }
 
 export function contentType(url: string | URL): string | undefined {
-  const path = isInst(url, URL) ? url.pathname : url;
-  return contentTypes[ext(path)]
+  return contentTypes[ext(toPathname(url))]
 }
 
-export function clientPath(opts: LocParams) {
+export function clientPath(opts: LocOpts) {
   return new URL('client.mjs', loc(opts))
 }
 
-export function dir(path: string, test?: DirTest) {return new Dir(path, test)}
+export function dir(path: string, test?: StrTest) {return new Dir(path, test)}
 
-export type DirTest = RegExp | ((path: string) => boolean)
+export type StrTestFn = (str: string) => boolean
+export type StrTest = RegExp | StrTestFn
 
 export class Dir {
-  private readonly url: URL
-  private readonly test?: DirTest
+  url: URL
+  test?: StrTest
 
-  constructor(path: string, test?: DirTest) {
-    validOpt(test, isTest)
+  constructor(path: string, test?: StrTest) {
     this.url = dirUrl(path, this.base())
-    this.test = test
+    this.test = validOpt(test, isStrTest)
   }
 
   base() {return cwdUrl(Deno.cwd())}
@@ -195,20 +199,20 @@ export class Dir {
   }
 }
 
-export interface BroadParams {
-  namespace?: string,
-  verbose?: boolean,
+export interface BroadOpts {
+  namespace?: string
+  verbose?: boolean
 }
 
 export class Broad extends Set<BroadClient> {
-  private readonly verbose?: boolean
-  private readonly url: URL
-  private readonly urlClient: URL
-  private readonly urlEvents: URL
-  private readonly urlEvent: URL
-  private readonly urlSend: URL
+  verbose?: boolean
+  readonly url: URL
+  readonly urlClient: URL
+  readonly urlEvents: URL
+  readonly urlEvent: URL
+  readonly urlSend: URL
 
-  constructor({namespace = defaultNamespace, verbose}: BroadParams = {}) {
+  constructor({namespace = defaultNamespace, verbose}: BroadOpts = {}) {
     valid(namespace, isStr)
 
     super()
@@ -227,8 +231,8 @@ export class Broad extends Set<BroadClient> {
 
   base() {return 'file:'}
 
-  async send(msg: Uint8Array) {
-    for (const client of this) await client.write(msg)
+  async send(msg: AnyData) {
+    for (const client of this) await client.writeJson(msg)
   }
 
   resOr404(req: Request) {
@@ -262,14 +266,10 @@ export class Broad extends Set<BroadClient> {
     return onlyGet(req) || this.resVia(req, this.EventClient, {headers: corsJsonHeaders})
   }
 
-  resVia<C extends new (bro: Broad, sig: AbortSignal) => BroadClient>(
-    req: Request,
-    Client: C,
-    opts?: ResponseInit
-  ) {
+  resVia<C extends typeof BroadClient>(req: Request, Client: C, opts?: ResponseInit) {
     const sig = req.signal
     if (sig?.aborted) return undefined
-    return new Response(new Client(this, sig), opts)
+    return new Response(new Client(this, sig).reader, opts)
   }
 
   async resSend(req: Request) {
@@ -298,12 +298,11 @@ export class Broad extends Set<BroadClient> {
     }
   }
 
-  deinit(msg: Record<string, unknown>) {
-    validOpt(msg, isDict)
-    msg = {type: 'deinit', ...msg}
+  deinit(msg: Dict) {
+    msg = {type: 'deinit', ...validOpt(msg, isDict)}
 
     for (const val of this) {
-      val.writeObj(msg)
+      val.writeJson(msg)
       val.deinit()
     }
   }
@@ -336,14 +335,15 @@ const corsJsonHeaders = {...corsHeaders, ...jsonHeaders}
 const corsJsHeaders = {...corsHeaders, ...jsHeaders}
 const corsEventStreamHeaders = {...corsHeaders, ...eventStreamHeaders}
 
-interface MainParams extends BroadParams, Deno.ListenOptions { }
+interface MainOpts extends BroadOpts, Deno.ListenOptions {}
 
-export async function main({namespace, hostname = defaultHostname, verbose, ...opts}: MainParams) {
+export async function main({namespace, hostname = defaultHostname, verbose, ...opts}: MainOpts) {
   const bro = new Broad({namespace, verbose})
-  const listener = Deno.listen({hostname, ...opts})
+  const lis = Deno.listen({hostname, ...opts})
 
-  if (verbose && isNetAddr(listener.addr)) {
-    console.log(`[afr] listening on http://${hostname || 'localhost'}:${listener.addr.port}`)
+  if (verbose) {
+    const port = addrPort(lis.addr)
+    console.log(`[afr] listening on http://${hostname || 'localhost'}${port ? `:${port}` : ``}`)
   }
 
   async function serveHttp(conn: Deno.Conn) {
@@ -359,11 +359,12 @@ export async function main({namespace, hostname = defaultHostname, verbose, ...o
     }
   }
 
-  for await (const conn of listener) serveHttp(conn).catch(logErr)
+  for await (const conn of lis) serveHttp(conn).catch(logErr)
 }
 
-function isNetAddr(addr: Deno.Addr): addr is Deno.NetAddr {
-  return ['tcp', 'udp'].includes(addr.transport);
+function addrPort(addr: Deno.Addr): number | undefined {
+  const {port} = addr as Deno.NetAddr
+  return isNum(port) ? port : undefined
 }
 
 export function mainWithArgs(args: string[]) {
@@ -386,7 +387,7 @@ Runs an Afr broadcaster server; "--port" is required. Examples:
 }
 
 // Variant of `Deno.watchFs` with support for `AbortSignal`.
-export async function* watchFs(target: string, opts?: WatchOpts) {
+export async function* watchFs(target: WatchTarget, opts?: WatchOpts) {
   const sig = opts?.signal
   const iter = Deno.watchFs(target, opts)
   const deinit = iter.close.bind(iter)
@@ -397,53 +398,44 @@ export async function* watchFs(target: string, opts?: WatchOpts) {
   }
   finally {
     sig?.removeEventListener('abort', deinit)
-    iter.close()
+    deinit()
   }
 }
 
-type StreamResObj = Uint8Array
+// Aliased to clarify the relationship between different parts of the code
+// using this type.
+export type Chunk = Uint8Array
 
-export class ReadWriter extends ReadableStream<StreamResObj> {
-  private readonly ctrl?: ReadableStreamDefaultController<StreamResObj>
+export interface ReaderOpts<T> {
+  start?: (ctrl: ReadableStreamDefaultController<T>) => void
+}
 
-  constructor(opts?: UnderlyingSource<StreamResObj>) {
-    let ctrl: ReadableStreamDefaultController<StreamResObj> | undefined = undefined
-    let self: this | undefined = undefined
+// Not generic over the chunk/entry type because `writeJson` assumes/requires a
+// stream of `Uint8Array` chunks.
+export class ReadWriter {
+  ctrl?: ReadableStreamDefaultController<Chunk>
+  reader: ReadableStream<Chunk>
 
-    super({
-      start(val) {
-        ctrl = val
-        return opts?.start?.(val)
+  constructor(opts?: ReaderOpts<Chunk>) {
+    this.reader = new ReadableStream<Chunk>({
+      start: ctrl => {
+        this.ctrl = ctrl
+        return opts?.start?.(ctrl)
       },
-      cancel() {
-        self?.deinit()
-      },
-      ...opts,
+      cancel: this.deinit.bind(this),
     })
-
-    self = this
-    this.ctrl = ctrl
   }
 
-  write(val: Uint8Array) {return this.ctrl?.enqueue(val)}
-
-  writeObj(val: Record<string, unknown>) {
-    this.write(enc.encode(JSON.stringify(val)))
-  }
-
-  // WHATWG streams have non-idempotent close, throwing on repeated calls.
-  // We have multiple code paths / callbacks leading to multiple calls.
-  deinit() {
-    try {this.ctrl?.close()}
-    catch (err) {ignore(err)}
-  }
+  write(val: Chunk) {return this.ctrl!.enqueue(val)}
+  writeJson(val: AnyData) {this.write(enc.encode(JSON.stringify(val)))}
+  deinit() {streamClose(this.ctrl)}
 }
 
 export class BroadClient extends ReadWriter {
-  private readonly bro: Broad
-  private readonly sig: AbortSignal
+  readonly bro: Broad
+  readonly sig: AbortSignal
 
-  constructor(bro: Broad, sig: AbortSignal, opts?: UnderlyingSource<StreamResObj>) {
+  constructor(bro: Broad, sig: AbortSignal, opts?: ReaderOpts<Chunk>) {
     validInst(bro, Broad)
     validInstOpt(sig, AbortSignal)
 
@@ -471,14 +463,14 @@ export class BroadClient extends ReadWriter {
 }
 
 export class EventClient extends BroadClient {
-  writeObj(val: Record<string, unknown>) {
-    super.writeObj(val)
+  writeJson(val: AnyData) {
+    super.writeJson(val)
     this.deinit()
   }
 }
 
 export class EventStreamClient extends BroadClient {
-  writeObj(val: Record<string, unknown>) {
+  writeJson(val: AnyData) {
     this.write(enc.encode(`data: ${JSON.stringify(val) || ''}\n\n`))
   }
 }
@@ -488,11 +480,8 @@ export class FsInfo {
   readonly stat: Deno.FileInfo
 
   constructor(url: URL, stat: Deno.FileInfo) {
-    validInst(url, URL)
-    valid(stat, isComp)
-
-    this.url = url
-    this.stat = stat
+    this.url = validInst(url, URL)
+    this.stat = valid(stat, isComp) as Deno.FileInfo
   }
 
   onlyFile() {
@@ -567,9 +556,9 @@ export async function procure<
   return undefined
 }
 
-export interface ReadableStreamFromReaderOpts { chunkSize?: number }
+export interface ReadableStreamFromReaderOpts {chunkSize?: number}
 
-export function readableStreamFromReader(reader: Deno.Reader & Deno.Closer, opts?: ReadableStreamFromReaderOpts) {
+export function readableStreamFromReader(reader: Deno.Reader | (Deno.Reader & Deno.Closer), opts?: ReadableStreamFromReaderOpts) {
   const chunkSize = opts?.chunkSize || defaultChunkSize
 
   return new ReadableStream({
@@ -581,89 +570,97 @@ export function readableStreamFromReader(reader: Deno.Reader & Deno.Closer, opts
 
         if (isNil(count)) {
           ctrl.close()
-          reader.close?.()
+          if (isCloser(reader)) reader.close()
           return
         }
 
         ctrl.enqueue(chunk.subarray(0, count))
-      } catch (err) {
+      }
+      catch (err) {
         ctrl.error(err)
-        reader.close?.()
+        if (isCloser(reader)) reader.close()
       }
     },
     cancel() {
-      reader.close?.()
+      if (isCloser(reader)) reader.close()
     },
   })
 }
 
 function add(a: string, b: string) {return a + b}
 
-type AnyFn = (...args: unknown[]) => unknown
-// deno-lint-ignore no-explicit-any
-type AbstractConstructor = abstract new(...args: any[]) => unknown
-type Test<Val> = (val: Val) => boolean
+type Comp = Object | Function
+type Cons<T> = abstract new(...args: any[]) => T
+type Test<T> = (val: unknown) => val is T
 
-function isNil(val: unknown): val is null | undefined {return val == null}
-function isStr(val: unknown): val is string     {return typeof val === 'string'}
-function isNum(val: unknown): val is number     {return typeof val === 'number'}
-function isInt(val: unknown): val is number     {return isNum(val) && ((val % 1) === 0)}
-function isNatPos(val: unknown): val is number  {return isInt(val) && val > 0}
-function isFun<Fn extends AnyFn>(val: unknown): val is Fn {
+function isNil(val: unknown): val is (null | undefined) {return val == null}
+function isStr(val: unknown): val is string             {return typeof val === 'string'}
+function isNum(val: unknown): val is number             {return typeof val === 'number'}
+function isInt(val: unknown): val is number             {return isNum(val) && ((val % 1) === 0)}
+function isNatPos(val: unknown): val is number          {return isInt(val) && val > 0}
+function isReg(val: unknown): val is RegExp             {return isInst(val, RegExp)}
+function isComp(val: unknown): val is Comp              {return isObj(val) || isFun(val)}
+function isStrTest(val: unknown): val is StrTest        {return isReg(val) || isFun<StrTestFn>(val)}
+
+const isArr = Array.isArray
+
+function isFun<T extends Function = Function>(val: unknown): val is T {
   return typeof val === 'function'
 }
-function isObj(val: unknown): val is Record<string, unknown> {
+
+// This actually detects `val is Object`. Our _runtime_ definition is `Dict` is
+// more restrictive. However, this signature allows us to test arbitrary
+// properties, which is permitted in JS, without TS barking.
+function isObj(val: unknown): val is Dict {
   return val !== null && typeof val === 'object'
 }
-function isArr<R extends Array<unknown>>(val: unknown): val is R {
-  return isInst(val, Array)
-}
-function isReg(val: unknown): val is RegExp {
-  return isInst(val, RegExp)
-}
-function isComp<
-  Fn extends AnyFn = AnyFn
->(val: unknown) {
-  return isObj(val) || isFun<Fn>(val)
-}
-function isTest<Fn extends AnyFn = AnyFn>(val: unknown) {return isFun<Fn>(val) || isReg(val)}
-function isInst<C extends AbstractConstructor>(val: unknown, Cls: C): val is InstanceType<C> {return isComp(val) && val instanceof Cls}
 
-function isDict<R extends Record<string, unknown> = Record<string, unknown>>(val: unknown): val is R {
+function isInst<T>(val: unknown, Cls: Cons<T>): val is T {
+  return isComp(val) && val instanceof Cls
+}
+
+type Key = string | symbol
+type Dict = Record<Key, unknown>
+
+function isDict(val: unknown): val is Dict {
   if (!isObj(val)) return false
   const proto = Object.getPrototypeOf(val)
   return proto === null || proto === Object.prototype
 }
 
+function isCloser(val: unknown): val is Deno.Closer {
+  return isObj(val) && isFun(val.close)
+}
 
-function valid<Val>(val: Val, test: Test<Val>) {
+function valid<T>(val: unknown, test: Test<T>): T {
   if (!isFun(test)) throw TypeError(`expected validator function, got ${show(test)}`)
-  if (!test(val)) invalid(val, test)
+  if (!test(val)) throw TypeError(`expected ${show(val)} to satisfy test ${show(test)}`)
+  return val
 }
 
-function validOpt<Val>(val: Val, test: Test<Val>) {
-  if (!isNil(val)) valid(val, test)
+function validOpt<T>(val: unknown, test: Test<T>): T | undefined {
+  return isNil(val) ? undefined : valid(val, test)
 }
 
-function validEachInst<C extends AbstractConstructor>(vals: unknown[], Cls: C) {
+function validEachInst<T>(vals: unknown[], Cls: Cons<T>): T[] {
   valid(vals, isArr)
-  vals.forEach((v) => validInst(v, Cls))
+  vals.forEach(validInstOf, Cls)
+  return vals as T[]
 }
 
-function invalid<Val>(val: Val, test: Test<Val>) {
-  throw TypeError(`expected ${show(val)} to satisfy test ${show(test)}`)
+function validInstOf<T>(this: Cons<T>, val: unknown) {
+  validInst(val, this)
 }
 
-function validInst<C extends AbstractConstructor>(val: unknown, Cls: C) {
-  if (!isInst(val, Cls)) {
-    const cons = isObj(val) ? val?.constructor : null
-    throw TypeError(`expected ${show(val)}${cons ? ` (instance of ${show(cons)})` : ``} to be an instance of ${show(Cls)}`)
-  }
+function validInst<T>(val: unknown, Cls: Cons<T>): T {
+  if (isInst(val, Cls)) return val
+  const cons = isObj(val) ? val?.constructor : null
+  throw TypeError(`expected ${show(val)}${cons ? ` (instance of ${show(cons)})` : ``} to be an instance of ${show(Cls)}`)
 }
 
-function validInstOpt(val: unknown, Cls: AbstractConstructor) {
+function validInstOpt<T>(val: unknown, Cls: Cons<T>): T | undefined {
   valid(Cls, isFun)
-  if (!isNil(val)) validInst(val, Cls)
+  return isNil(val) ? undefined : validInst(val, Cls)
 }
 
 function show(val: unknown) {
@@ -671,25 +668,20 @@ function show(val: unknown) {
 
   // Plain data becomes JSON, if possible.
   if (isArr(val) || isDict(val) || isStr(val)) {
-    try {
-      return JSON.stringify(val)
-    }
-    catch (__) {
-      return String(val)
-    }
+    try {return JSON.stringify(val)} catch {}
   }
 
   return String(val)
 }
 
-export interface LocParams {
-  url?: string | URL,
-  port: number,
-  hostname?: string,
-  namespace?: string,
+export interface LocOpts {
+  url?: string | URL
+  port?: number
+  hostname?: string
+  namespace?: string
 }
 
-export function loc({url, port, hostname = defaultHostname, namespace = defaultNamespace}: LocParams) {
+export function loc({url, port, hostname = defaultHostname, namespace = defaultNamespace}: LocOpts) {
   if (!url) {
     valid(port, isNatPos)
     valid(hostname, isStr)
@@ -736,7 +728,7 @@ function ensureTrailingSlash(val: string) {
 }
 
 function urlMut<Fn extends (pathname: string) => string>(url: URL, fun: Fn): URL
-function urlMut<Fn extends (pathname: string, ...args: [A1]) => string, A1>(url: URL, fun: Fn, ...args: [A1]): URL;
+function urlMut<Fn extends (pathname: string, ...args: [A1]) => string, A1>(url: URL, fun: Fn, ...args: [A1]): URL
 function urlMut<Fn extends (pathname: string, ...args: unknown[]) => string>(url: URL, fun: Fn, ...args: unknown[]): URL {
   validInst(url, URL)
 
@@ -782,17 +774,13 @@ function trimPrefix(str: string, pre: string) {
   return str.slice(pre.length)
 }
 
-export function ignore(_err: Error) {}
-
 function nopRes() {return new Response()}
+
+interface CodedErr extends Error {code: string}
 
 export function errRes(err: Error) {
   const msg = (
-    err
-    && (
-      err.stack || err.message
-      || /* FIXME: what kind of error should return 'code'? */ (err as unknown as { code: string }).code
-    )
+    err && (err.stack || err.message || (err as CodedErr).code)
   ) || `unknown ${err?.name || 'error'}`
   return new Response(msg, {status: 500})
 }
@@ -845,7 +833,9 @@ async function resOk(res: Response) {
   throw Error(`non-OK response${status ? ` (code ${status})` : ''}: ${body}`)
 }
 
-function resBody(res: Response): Promise<Record<string, unknown> | string> {
+export type ResBody = AnyData | string
+
+function resBody(res: Response): Promise<ResBody> {
   const type = res.headers.get('content-type')
   if (type && /\bapplication[/]json\b/.test(type)) {
     return res.json()
@@ -853,7 +843,7 @@ function resBody(res: Response): Promise<Record<string, unknown> | string> {
   return res.text()
 }
 
-function resOkBody(res: Response): Promise<Record<string, unknown> | string> {
+function resOkBody(res: Response): Promise<ResBody> {
   return resOk(res).then(resBody)
 }
 
@@ -861,23 +851,25 @@ function parseArgs(args: string[]) {
   valid(args, isArr)
   args = args.slice()
 
-  const opts: Record<string, unknown> = {}
+  const opts: Dict = {}
 
   while (args.length) {
     const arg = args.shift()!
 
     const flagReg = /^--(\w+)$/
-    if (!flagReg.test(arg)) throw Error(`expected flag like "--arg", found ${show(arg)}`)
-    const key = arg.match(flagReg)![1]
+    const match = arg.match(flagReg)
+    if (!match) throw Error(`expected flag like "--arg", found ${show(arg)}`)
+
+    const key = match[1]
 
     if (!args.length) throw Error(`expected value following flag ${show(arg)}`)
     opts[key] = maybeJsonParse(args.shift())
   }
 
-  return opts as unknown as MainParams
+  return opts as unknown as MainOpts
 }
 
-function maybeJsonParse<R extends Record<string, unknown>>(val?: string): (typeof val) extends string ? R : string | undefined {
+function maybeJsonParse<R extends AnyData>(val?: string): typeof val extends string ? R : (string | undefined) {
   if (!isStr(val)) return val
 
   try {
@@ -894,6 +886,12 @@ function maybeJsonParse<R extends Record<string, unknown>>(val?: string): (typeo
 function fsEventKindToType(kind: Deno.FsEvent['kind']): WatchType {
   valid(kind, isStr)
   return kind === 'modify' ? 'change' : kind
+}
+
+// WHATWG streams have non-idempotent close, throwing on repeated calls.
+// We have multiple code paths / callbacks leading to multiple calls.
+function streamClose(ctrl?: ReadableStreamDefaultController) {
+  try {ctrl?.close()} catch {}
 }
 
 if (import.meta.main) mainWithArgs(Deno.args)

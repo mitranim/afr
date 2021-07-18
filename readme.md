@@ -59,7 +59,7 @@ Super-lightweight alternative to other file-serving libraries, and also to tools
 See the API below.
 
 ```js
-import * as a from 'https://deno.land/x/afr@0.4.2/afr.mjs'
+import * as a from 'https://deno.land/x/afr@0.5.0/afr.ts'
 ```
 
 ### As CLI
@@ -69,12 +69,14 @@ The CLI doesn't serve files. It's a development tool that runs a [broadcaster](#
 Put this in a makefile, and run concurrently with your server. See [examples](#examples).
 
 ```sh
-deno run --allow-net --allow-read --unstable https://deno.land/x/afr@0.4.2/afr.mjs --port 23456 --verbose true
+deno run --allow-net --allow-read --unstable https://deno.land/x/afr@0.5.0/afr.ts --port 23456 --verbose true
 ```
 
 ## Examples
 
 Runnable example: clone this repo, `cd` to [`examples`](examples), and run `make`.
+
+Example server code has functionally-identical TS and JS versions (`srv.ts` and `srv.mjs`).
 
 ## API
 
