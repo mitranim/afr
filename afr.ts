@@ -262,7 +262,11 @@ export class Broad extends Set<BroadClient> {
     return onlyGet(req) || this.resVia(req, this.EventClient, {headers: corsJsonHeaders})
   }
 
-  resVia<C extends new (...args: any[]) => BroadClient>(req: Request, Client: C, opts?: ResponseInit) {
+  resVia<C extends new (bro: Broad, sig: AbortSignal) => BroadClient>(
+    req: Request,
+    Client: C,
+    opts?: ResponseInit
+  ) {
     const sig = req.signal
     if (sig?.aborted) return undefined
     return new Response(new Client(this, sig), opts)
@@ -595,12 +599,17 @@ export function readableStreamFromReader(reader: Deno.Reader & Deno.Closer, opts
 
 function add(a: string, b: string) {return a + b}
 
-function isNil(val: unknown): val is null      {return val == null}
-function isStr(val: unknown): val is string    {return typeof val === 'string'}
-function isNum(val: unknown): val is number    {return typeof val === 'number'}
-function isInt(val: unknown): val is number    {return isNum(val) && ((val % 1) === 0)}
-function isNatPos(val: unknown): val is number {return isInt(val) && val > 0}
-function isFun<Fn extends Function>(val: unknown): val is Fn {
+type AnyFn = (...args: unknown[]) => unknown
+// deno-lint-ignore no-explicit-any
+type AbstractConstructor = abstract new(...args: any[]) => unknown
+type Test<Val> = (val: Val) => boolean
+
+function isNil(val: unknown): val is null | undefined {return val == null}
+function isStr(val: unknown): val is string     {return typeof val === 'string'}
+function isNum(val: unknown): val is number     {return typeof val === 'number'}
+function isInt(val: unknown): val is number     {return isNum(val) && ((val % 1) === 0)}
+function isNatPos(val: unknown): val is number  {return isInt(val) && val > 0}
+function isFun<Fn extends AnyFn>(val: unknown): val is Fn {
   return typeof val === 'function'
 }
 function isObj(val: unknown): val is Record<string, unknown> {
@@ -613,11 +622,11 @@ function isReg(val: unknown): val is RegExp {
   return isInst(val, RegExp)
 }
 function isComp<
-  Fn extends Function = Function
+  Fn extends AnyFn = AnyFn
 >(val: unknown) {
   return isObj(val) || isFun<Fn>(val)
 }
-function isTest<Fn extends Function = Function>(val: unknown) {return isFun<Fn>(val) || isReg(val)}
+function isTest<Fn extends AnyFn = AnyFn>(val: unknown) {return isFun<Fn>(val) || isReg(val)}
 function isInst<C extends AbstractConstructor>(val: unknown, Cls: C): val is InstanceType<C> {return isComp(val) && val instanceof Cls}
 
 function isDict<R extends Record<string, unknown> = Record<string, unknown>>(val: unknown): val is R {
@@ -626,8 +635,6 @@ function isDict<R extends Record<string, unknown> = Record<string, unknown>>(val
   return proto === null || proto === Object.prototype
 }
 
-type AbstractConstructor = abstract new(...args: any[]) => any
-type Test<Val> = (val: Val) => boolean
 
 function valid<Val>(val: Val, test: Test<Val>) {
   if (!isFun(test)) throw TypeError(`expected validator function, got ${show(test)}`)
