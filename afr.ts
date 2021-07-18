@@ -112,15 +112,15 @@ export async function resSiteWithNotFound(req: Request, dirs: Dir[], opts?: File
   return (await resSite(req, dirs, opts)) || (await resSiteNotFound(req, dirs, opts))
 }
 
-export function resolve(dirs: Dir[], url: string | URL) {
+export function resolve(dirs: Dir[], url: string | URL): Promise<FsInfo | undefined> {
   return procure(dirs, dirResolve, url)
 }
 
-async function resolveFile(dirs: Dir[], url: string | URL) {
+async function resolveFile(dirs: Dir[], url: string | URL): Promise<FsInfo | undefined> {
   return (await resolve(dirs, url))?.onlyFile()
 }
 
-export function resolveSiteFile(dirs: Dir[], url: string | URL) {
+export function resolveSiteFile(dirs: Dir[], url: string | URL): Promise<FsInfo | undefined> {
   return procure(dirs, dirResolveSiteFile, url)
 }
 
@@ -188,7 +188,7 @@ export class Dir {
     if (!path) return false
 
     const {test} = this
-    if (isFun(test)) return test(path)
+    if (isFun<StrTestFn>(test)) return test(path)
     if (isReg(test)) return test.test(path)
     return true
   }
@@ -481,7 +481,7 @@ export class FsInfo {
 
   constructor(url: URL, stat: Deno.FileInfo) {
     this.url = validInst(url, URL)
-    this.stat = valid(stat, isComp) as Deno.FileInfo
+    this.stat = valid(stat, isFileInfo)
   }
 
   onlyFile() {
@@ -522,7 +522,7 @@ export async function dirResolveSiteFile(dir: Dir, url: string | URL) {
       )
       || (await dirResolveFile(dir, relUrl('index.html', url)))
     ))
-    || false
+    || undefined
   )
 }
 
@@ -538,13 +538,10 @@ export async function fsMaybeStat(path: string | URL) {
 }
 
 export async function procure<
-  Fn extends (dir: Dir, ...args: [A1]) => Promise<FsInfo | undefined | false>,
-  A1
->(
-  dirs: Dir[],
-  fun: Fn,
-  ...args: [A1]
-): Promise<FsInfo | undefined> {
+  R,
+  A,
+  F extends (dir: Dir, ...args: A[]) => Promise<R | undefined>,
+>(dirs: Dir[], fun: F, ...args: A[]): Promise<R | undefined> {
   validEachInst(dirs, Dir)
   valid(fun, isFun)
 
@@ -589,21 +586,30 @@ export function readableStreamFromReader(reader: Deno.Reader | (Deno.Reader & De
 
 function add(a: string, b: string) {return a + b}
 
-type Comp = Object | Function
+type Nil = null | undefined
+
+// deno-lint-ignore no-explicit-any
 type Cons<T> = abstract new(...args: any[]) => T
+
 type Test<T> = (val: unknown) => val is T
 
-function isNil(val: unknown): val is (null | undefined) {return val == null}
-function isStr(val: unknown): val is string             {return typeof val === 'string'}
-function isNum(val: unknown): val is number             {return typeof val === 'number'}
-function isInt(val: unknown): val is number             {return isNum(val) && ((val % 1) === 0)}
-function isNatPos(val: unknown): val is number          {return isInt(val) && val > 0}
-function isReg(val: unknown): val is RegExp             {return isInst(val, RegExp)}
-function isComp(val: unknown): val is Comp              {return isObj(val) || isFun(val)}
-function isStrTest(val: unknown): val is StrTest        {return isReg(val) || isFun<StrTestFn>(val)}
+function isNil     (val: unknown): val is Nil      {return val == null}
+function isStr     (val: unknown): val is string   {return typeof val === 'string'}
+function isBool    (val: unknown): val is boolean  {return typeof val === 'boolean'}
+function isNum     (val: unknown): val is number   {return typeof val === 'number'}
+function isInt     (val: unknown): val is number   {return isNum(val) && ((val % 1) === 0)}
+function isNatPos  (val: unknown): val is number   {return isInt(val) && val > 0}
+function isReg     (val: unknown): val is RegExp   {return isInst(val, RegExp)}
+function isStrTest (val: unknown): val is StrTest  {return isReg(val) || isFun<StrTestFn>(val)}
 
 const isArr = Array.isArray
 
+// deno-lint-ignore ban-types
+function isCls<T extends Function = Function>(val: unknown): val is T {
+  return isFun(val) && typeof val.prototype === 'object'
+}
+
+// deno-lint-ignore ban-types
 function isFun<T extends Function = Function>(val: unknown): val is T {
   return typeof val === 'function'
 }
@@ -616,7 +622,7 @@ function isObj(val: unknown): val is Dict {
 }
 
 function isInst<T>(val: unknown, Cls: Cons<T>): val is T {
-  return isComp(val) && val instanceof Cls
+  return isObj(val) && val instanceof Cls
 }
 
 type Key = string | symbol
@@ -629,11 +635,15 @@ function isDict(val: unknown): val is Dict {
 }
 
 function isCloser(val: unknown): val is Deno.Closer {
-  return isObj(val) && isFun(val.close)
+  return isObj(val) && isFun<() => void>(val.close)
+}
+
+function isFileInfo(val: unknown): val is Deno.FileInfo {
+  return isObj(val) && isBool(val.isFile)
 }
 
 function valid<T>(val: unknown, test: Test<T>): T {
-  if (!isFun(test)) throw TypeError(`expected validator function, got ${show(test)}`)
+  if (!isFun<Test<T>>(test)) throw TypeError(`expected validator function, got ${show(test)}`)
   if (!test(val)) throw TypeError(`expected ${show(val)} to satisfy test ${show(test)}`)
   return val
 }
@@ -653,13 +663,14 @@ function validInstOf<T>(this: Cons<T>, val: unknown) {
 }
 
 function validInst<T>(val: unknown, Cls: Cons<T>): T {
+  valid(Cls, isCls)
   if (isInst(val, Cls)) return val
   const cons = isObj(val) ? val?.constructor : null
   throw TypeError(`expected ${show(val)}${cons ? ` (instance of ${show(cons)})` : ``} to be an instance of ${show(Cls)}`)
 }
 
 function validInstOpt<T>(val: unknown, Cls: Cons<T>): T | undefined {
-  valid(Cls, isFun)
+  valid(Cls, isCls)
   return isNil(val) ? undefined : validInst(val, Cls)
 }
 
@@ -668,7 +679,8 @@ function show(val: unknown) {
 
   // Plain data becomes JSON, if possible.
   if (isArr(val) || isDict(val) || isStr(val)) {
-    try {return JSON.stringify(val)} catch {}
+    try {return JSON.stringify(val)}
+    catch (err) {ignore(err)}
   }
 
   return String(val)
@@ -891,7 +903,10 @@ function fsEventKindToType(kind: Deno.FsEvent['kind']): WatchType {
 // WHATWG streams have non-idempotent close, throwing on repeated calls.
 // We have multiple code paths / callbacks leading to multiple calls.
 function streamClose(ctrl?: ReadableStreamDefaultController) {
-  try {ctrl?.close()} catch {}
+  try {ctrl?.close()}
+  catch (err) {ignore(err)}
 }
+
+function ignore(_err: Error) {}
 
 if (import.meta.main) mainWithArgs(Deno.args)
