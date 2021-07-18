@@ -6,7 +6,7 @@ example:
 	$(PAR) afr srv
 
 afr:
-	$(DENO) ../afr.mjs --port 34566 --verbose true
+	$(DENO) ../afr.ts --port 34566 --verbose true
 
 srv:
-	$(DENO) srv.mjs
+	$(DENO) srv.ts

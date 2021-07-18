@@ -1,5 +1,3 @@
-/* global Deno */
-
 import * as a from '../afr.ts'
 
 const afrOpts = {port: 34566}
@@ -20,13 +18,13 @@ async function watch() {
   }
 }
 
-async function serveHttp(conn) {
+async function serveHttp(conn: Deno.Conn) {
   for await (const event of Deno.serveHttp(conn)) {
     event.respondWith(response(event.request)).catch(a.logErr)
   }
 }
 
-async function response(req) {
+async function response(req: Request) {
   return (
     (await a.resSiteWithNotFound(req, dirs)) ||
     new Response('not found', {status: 404})
