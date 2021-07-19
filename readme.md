@@ -305,8 +305,6 @@ Some APIs are exported but undocumented to avoid bloating the docs. Check the so
 
 Supports only the built-in Deno HTTP server. For stdlib support, use [`afr@0.3.2`](https://github.com/mitranim/afr/blob/ef96d7daa0e6d1540e54e43c5e295521e95ab020/readme.md).
 
-No TypeScript. May convert in later versions.
-
 No compression support. Put your Deno server behind a reverse proxy, such as Nginx, configured for compression.
 
 No default HTTP cache headers. Caching strategies may vary. You should add your own cache headers. Afr makes it easy:
