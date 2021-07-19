@@ -87,7 +87,7 @@ Example server code has functionally-identical TS and JS versions (`srv.ts` and 
 Fundamental tool for serving files and handling FS events. Takes an FS path and an optional filter. For example:
 
 ```js
-const dir = a.dir('target', /[.]html|css|mjs$/)
+const dir = a.dir('target', /[.](?:html|css|mjs)$/)
 ```
 
 Many Afr functions require an array of dirs:
@@ -95,7 +95,7 @@ Many Afr functions require an array of dirs:
 ```js
 const dirs = [
   a.dir('target'),
-  a.dir('.', /[.]html|css|mjs$/),
+  a.dir('.', /[.](?:html|css|mjs)$/),
 ]
 ```
 
@@ -104,7 +104,7 @@ The filter may be either a regexp or a function. Afr applies it to a path that i
 ```js
 const dirs = [
   a.dir('target'),
-  a.dir('.', /^static|images|scripts[/]/),
+  a.dir('.', /^(?:static|images|scripts)[/]/),
 ]
 ```
 
