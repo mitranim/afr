@@ -323,7 +323,7 @@ For etag support, use slightly lower-level tools. Use the undocumented function 
 
 ### `0.5.0`
 
-Now written in TS.
+Now written in TS, courtesy of @pleshevskiy.
 
 ### `0.4.2`
 
