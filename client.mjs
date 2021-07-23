@@ -24,7 +24,10 @@ export function main() {
       req.close()
       req = undefined
     }
-    if (timer) clearTimeout(timer)
+    if (timer) {
+      clearTimeout(timer)
+      timer = undefined
+    }
   }
 
   function onEventStreamMessage({data}) {

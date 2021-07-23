@@ -59,7 +59,7 @@ Super-lightweight alternative to other file-serving libraries, and also to tools
 See the API below.
 
 ```js
-import * as a from 'https://deno.land/x/afr@0.5.0/afr.ts'
+import * as a from 'https://deno.land/x/afr@0.5.1/afr.ts'
 ```
 
 ### As CLI
@@ -69,7 +69,7 @@ The CLI doesn't serve files. It's a development tool that runs a [broadcaster](#
 Put this in a makefile, and run concurrently with your server. See [examples](#examples).
 
 ```sh
-deno run --allow-net --allow-read --unstable https://deno.land/x/afr@0.5.0/afr.ts --port 23456 --verbose true
+deno run --allow-net --allow-read --unstable https://deno.land/x/afr@0.5.1/afr.ts --port 23456 --verbose true
 ```
 
 ## Examples
@@ -318,6 +318,10 @@ const fileInit = {headers: {'cache-control': 'max-age=31536000'}}
 For etag support, use slightly lower-level tools. Use the undocumented function `resolveFile` to get FS stats, generate an etag from that, then serve via `resExactFile`.
 
 ## Changelog
+
+### `0.5.1`
+
+Minor TS tweak to satisfy some incorrect environmental lib definitions.
 
 ### `0.5.0`
 

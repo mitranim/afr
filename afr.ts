@@ -39,7 +39,7 @@ export function send(body: SendBody, opts: SendOpts) {
   valid(body, isDict)
   valid(opts, isDict)
 
-  const url = new URL('send', loc(opts))
+  const url = new URL('send', loc(opts)).toString()
   const fetchOpts: RequestInit = {headers: jsonHeaders, ...opts, method: 'POST', body: JSON.stringify(body)}
 
   return fetch(url, fetchOpts).then(resOkBody)
