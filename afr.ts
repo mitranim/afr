@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-net --allow-read --unstable
+#!/usr/bin/env -S deno run --allow-net --allow-read --unstable --no-check
 
 /* global Deno */
 

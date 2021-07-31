@@ -69,7 +69,7 @@ The CLI doesn't serve files. It's a development tool that runs a [broadcaster](#
 Put this in a makefile, and run concurrently with your server. See [examples](#examples).
 
 ```sh
-deno run --allow-net --allow-read --unstable https://deno.land/x/afr@0.5.1/afr.ts --port 23456 --verbose true
+deno run --allow-net --allow-read --unstable --no-check https://deno.land/x/afr@0.5.1/afr.ts --port 23456 --verbose true
 ```
 
 ## Examples
