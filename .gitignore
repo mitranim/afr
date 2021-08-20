@@ -1,7 +1,10 @@
 /*
 !/examples
+!/afr
 !/.*rc
 !/.*ignore
 !/*.ts
 !/*.mjs
 !/*.md
+!/*.go
+!/go.mod

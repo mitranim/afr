@@ -6,6 +6,9 @@
 * Restrict paths via regexps or functions.
 * Optional: automatic `.html` or `index.html` fallbacks, just like GitHub Pages.
 * Optional: on file changes, reinject CSS or reload page.
+* Optional: partial [Go](https://golang.org) implementation.
+  * Only broadcaster, no file server.
+  * API doc: https://pkg.go.dev/github.com/mitranim/afr.
 
 Components:
 
@@ -30,7 +33,7 @@ Other features:
 
 Super-lightweight alternative to other file-serving libraries, and also to tools like Browsersync, Livereload, etc.
 
-**This readme is for Deno.** For Node support, see [`afr@0.3.2`](https://github.com/mitranim/afr/blob/ef96d7daa0e6d1540e54e43c5e295521e95ab020/readme.md).
+**This readme is for Deno.** For Node support, see [`afr@0.3.2`](https://github.com/mitranim/afr/blob/ef96d7daa0e6d1540e54e43c5e295521e95ab020/readme.md). For Go, see https://pkg.go.dev/github.com/mitranim/afr.
 
 ## TOC
 
@@ -56,20 +59,36 @@ Super-lightweight alternative to other file-serving libraries, and also to tools
 
 ### As Library
 
-See the API below.
+For Deno (see API below):
 
 ```js
-import * as a from 'https://deno.land/x/afr@0.5.1/afr.ts'
+import * as a from 'https://deno.land/x/afr@0.6.0/afr.ts'
+```
+
+For Go (see https://pkg.go.dev/github.com/mitranim/afr):
+
+```golang
+import "github.com/mitranim/afr"
 ```
 
 ### As CLI
 
 The CLI doesn't serve files. It's a development tool that runs a [broadcaster](#class-broadopts) in a separate process, allowing clients to remain connected, so that your server can signal page reload on restart.
 
-Put this in a makefile, and run concurrently with your server. See [examples](#examples).
+The following command runs the Deno CLI. This should be put in a makefile, and ran concurrently with your server. See [examples](#examples). Requires Deno >= 1.13.0 or `--unstable`.
 
 ```sh
-deno run --allow-net --allow-read --unstable --no-check https://deno.land/x/afr@0.5.1/afr.ts --port 23456 --verbose true
+deno run --allow-net --allow-read --no-check https://deno.land/x/afr@0.6.0/afr.ts --port 23456 --verbose true
+```
+
+Alternatively, use the equivalent Go CLI:
+
+```sh
+go install github.com/mitranim/afr/afr@latest
+
+afr --help
+
+afr -v -p 23456
 ```
 
 ## Examples
@@ -219,6 +238,8 @@ async function change() {
 
 Running Afr [as a CLI](#as-cli) starts an HTTP server that handles all requests using a [`Broad`](#class-broadopts) instance and responds with 404 to everything unknown.
 
+`Broad` is also available in the Go port. See `afr.go`.
+
 ### `function send(msg, opts)`
 
 `ƒ(any, SendOpts) -> Promise`
@@ -318,6 +339,10 @@ const fileInit = {headers: {'cache-control': 'max-age=31536000'}}
 For etag support, use slightly lower-level tools. Use the undocumented function `resolveFile` to get FS stats, generate an etag from that, then serve via `resExactFile`.
 
 ## Changelog
+
+### `0.6.0`
+
+Added a partial Go implementation. There are no changes in JS.
 
 ### `0.5.1`
 

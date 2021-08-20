@@ -1,6 +1,6 @@
 MAKEFLAGS := --silent --always-make
 PAR := $(MAKE) -j 128
-DENO := deno run --watch --allow-net --allow-read --unstable
+DENO := deno run --watch --allow-net --allow-read
 
 example:
 	$(PAR) afr srv
