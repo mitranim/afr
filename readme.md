@@ -62,7 +62,7 @@ Super-lightweight alternative to other file-serving libraries, and also to tools
 For Deno (see API below):
 
 ```js
-import * as a from 'https://deno.land/x/afr@0.6.0/afr.ts'
+import * as a from 'https://deno.land/x/afr@0.6.1/afr.ts'
 ```
 
 For Go (see https://pkg.go.dev/github.com/mitranim/afr):
@@ -78,7 +78,7 @@ The CLI doesn't serve files. It's a development tool that runs a [broadcaster](#
 The following command runs the Deno CLI. This should be put in a makefile, and ran concurrently with your server. See [examples](#examples). Requires Deno >= 1.13.0 or `--unstable`.
 
 ```sh
-deno run --allow-net --allow-read --no-check https://deno.land/x/afr@0.6.0/afr.ts --port 23456 --verbose true
+deno run --allow-net --allow-read --no-check https://deno.land/x/afr@0.6.1/afr.ts --port 23456 --verbose true
 ```
 
 Alternatively, use the equivalent Go CLI:
@@ -339,6 +339,10 @@ const fileInit = {headers: {'cache-control': 'max-age=31536000'}}
 For etag support, use slightly lower-level tools. Use the undocumented function `resolveFile` to get FS stats, generate an etag from that, then serve via `resExactFile`.
 
 ## Changelog
+
+### `0.6.1`
+
+Add unlicense file for pkg.go.dev.
 
 ### `0.6.0`
 
