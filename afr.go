@@ -92,7 +92,7 @@ func (self *Broad) SendMsg(msg Msg) {
 }
 
 func (self *Broad) getClient(rew http.ResponseWriter, _ *http.Request) {
-	rew.Header().Set("content-type", "application/javascript")
+	rew.Header().Set(`Content-Type`, `application/javascript`)
 	tryInt(io.WriteString(rew, ClientScript))
 }
 
@@ -177,15 +177,14 @@ type Msg struct {
 type chunk []byte
 
 func eventStreamInit(rew http.ResponseWriter, req *http.Request) {
-	rew.Header().Set("content-type", "text/event-stream")
+	rew.Header().Set(`Content-Type`, `text/event-stream`)
 	flush(rew)
 }
 
 func eventStreamWrite(rew http.ResponseWriter, val []byte) {
-	buf := []byte(`data: `)
-	buf = append(buf, val...)
-	buf = append(buf, "\n\n"...)
-	tryInt(rew.Write(buf))
+	tryInt(io.WriteString(rew, `data: `))
+	tryInt(rew.Write(val))
+	tryInt(io.WriteString(rew, "\n\n"))
 	flush(rew)
 }
 
