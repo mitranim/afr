@@ -62,7 +62,7 @@ Super-lightweight alternative to other file-serving libraries, and also to tools
 For Deno (see API below):
 
 ```js
-import * as a from 'https://deno.land/x/afr@v0.6.1/afr.ts'
+import * as a from 'https://deno.land/x/afr@v0.6.3/afr.ts'
 ```
 
 For Go (see https://pkg.go.dev/github.com/mitranim/afr):
@@ -78,7 +78,7 @@ The CLI doesn't serve files. It's a development tool that runs a [broadcaster](#
 The following command runs the Deno CLI. This should be put in a makefile, and ran concurrently with your server. See [examples](#examples). Requires Deno >= 1.13.0 or `--unstable`.
 
 ```sh
-deno run --allow-net --allow-read --no-check https://deno.land/x/afr@v0.6.1/afr.ts --port 23456 --verbose true
+deno run --allow-net --allow-read --no-check https://deno.land/x/afr@v0.6.3/afr.ts --port 23456 --verbose true
 ```
 
 Alternatively, use the equivalent Go CLI:
@@ -298,7 +298,7 @@ interface FsEvent {
 }
 ```
 
-Wraps `Deno.watchFs` (Deno), converting FS events into messages understood by `client.mjs`.
+Wraps `Deno.watchFs`, converting FS events into messages understood by `client.mjs`.
 
 `path` and `opts` are passed directly to the underlying FS watch API. `dirs` must be an array of [`Dir`](#class-dirpath-filter); they're used to convert absolute FS paths to relative URL paths, and to filter events via `dir.allow`.
 
@@ -340,11 +340,19 @@ For etag support, use slightly lower-level tools. Use the undocumented function 
 
 ## Changelog
 
-### `0.6.1`
+### `v0.6.3`
+
+Revert `v0.6.2`.
+
+### `v0.6.2`
+
+Client stops auto-reconnecting after N attempts.
+
+### `v0.6.1`
 
 Add unlicense file for pkg.go.dev.
 
-### `0.6.0`
+### `v0.6.0`
 
 Added a partial Go implementation. There are no changes in JS.
 

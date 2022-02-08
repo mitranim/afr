@@ -5,17 +5,12 @@ export function main() {
 
   let req
   let timer
-  let remAttempts
 
   reinit()
 
   function reinit() {
     deinit()
     req = new EventSource(new URL(`events`, url))
-
-    // Only works in Chrome.
-    req.onopen = onEventSourceOpen
-
     req.onmessage = onEventSourceMessage
     req.onerror = onEventSourceError
   }
@@ -28,28 +23,9 @@ export function main() {
     finally {req = undefined}
   }
 
-  function onEventSourceOpen() {remAttempts = 8}
-
   function onEventSourceError() {
     deinit()
-
-    /*
-    Why limited attempts: because when the server is down, we want to eventually
-    give up and stop using CPU. Note that we don't want exponential backoff. It
-    should either reconnect immediately, or not bother reconnecting.
-    Reconnecting after a large delay is pointless, because the user would have
-    already reloaded manually.
-
-    Why attempts may be null: because only Chrome fires `onopen`.
-
-    Why attempts are reset only on `onopen`: seems to be the only way that makes
-    sense. We can't reset attempts on each attempt, and when the browser
-    doesn't support `onopen`, we don't want to use a limited global counter
-    that only ever goes down.
-    */
-    if (remAttempts == null || remAttempts-- > 0) {
-      timer = setTimeout(reinit, delay)
-    }
+    timer = setTimeout(reinit, delay)
   }
 
   function onEventSourceMessage({data}) {
